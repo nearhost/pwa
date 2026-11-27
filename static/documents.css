@@ -24,8 +24,8 @@
   --nh-doc-code-bg: #e6e8e1;
   --nh-doc-rule: #b9bfb5;
   --nh-doc-line: #dcdfd7;
-  --nh-doc-link: #4a6200;
-  --nh-doc-accent: #4a6200;
+  --nh-doc-link: #b0156c;
+  --nh-doc-accent: #b0156c;
   --nh-doc-image-outline: oklch(0 0 0 / 0.1);
   --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   /* Syntax, after chroma's github style. */
@@ -54,16 +54,16 @@
 /* Match app, dark: the default, and the scheme data-nh-scheme="dark" names. */
 :where(:root[data-nh-theme='app']) {
   color-scheme: dark;
-  --nh-doc-ground: #0f1210;
-  --nh-doc-text: #ecefe8;
-  --nh-doc-muted: #a4ada5;
-  --nh-doc-code-bg: #1e231f;
-  --nh-doc-rule: #4a534b;
-  --nh-doc-line: #2a312b;
-  --nh-doc-link: #d6f26b;
-  --nh-doc-accent: #d6f26b;
+  --nh-doc-ground: #111013;
+  --nh-doc-text: #f4eef2;
+  --nh-doc-muted: #b9a8b4;
+  --nh-doc-code-bg: #231f27;
+  --nh-doc-rule: #4d4552;
+  --nh-doc-line: #2f2a33;
+  --nh-doc-link: #ff70c8;
+  --nh-doc-accent: #ff70c8;
   --nh-doc-image-outline: oklch(1 0 0 / 0.1);
-  --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f1210' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111013' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   /* Syntax, after chroma's github-dark style. */
   --nh-doc-hl-keyword: #ff7b72;
   --nh-doc-hl-constant: #79c0ff;
@@ -83,8 +83,8 @@
   --nh-doc-hl-error: #f85149;
   --nh-doc-hl-error-text: #f85149;
   --nh-doc-hl-error-bg: transparent;
-  --nh-doc-hl-line: #2a312b;
-  --nh-doc-hl-number-line: #818a82;
+  --nh-doc-hl-line: #2f2a33;
+  --nh-doc-hl-number-line: #a08f9b;
 }
 
 :where(:root[data-nh-theme='app'][data-nh-scheme='dark']) {
@@ -94,14 +94,14 @@
 /* Match app, light: the scheme data-nh-scheme="light" names. Keep in step with the block below. */
 :where(:root[data-nh-theme='app'][data-nh-scheme='light']) {
   color-scheme: light;
-  --nh-doc-ground: #f4f5f1;
-  --nh-doc-text: #1b1f1c;
-  --nh-doc-muted: #5c645d;
-  --nh-doc-code-bg: #e6e9e0;
-  --nh-doc-rule: #b9bfb5;
-  --nh-doc-line: #dde0d9;
-  --nh-doc-link: #4a6200;
-  --nh-doc-accent: #4a6200;
+  --nh-doc-ground: #f6f4f6;
+  --nh-doc-text: #1e1820;
+  --nh-doc-muted: #5b4f5a;
+  --nh-doc-code-bg: #ebe7eb;
+  --nh-doc-rule: #bfb6bd;
+  --nh-doc-line: #ddd7dc;
+  --nh-doc-link: #b0156c;
+  --nh-doc-accent: #b0156c;
   --nh-doc-image-outline: oklch(0 0 0 / 0.1);
   --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --nh-doc-hl-keyword: #cf222e;
@@ -122,22 +122,22 @@
   --nh-doc-hl-error: #82071e;
   --nh-doc-hl-error-text: #f6f8fa;
   --nh-doc-hl-error-bg: #82071e;
-  --nh-doc-hl-line: #dde0d9;
-  --nh-doc-hl-number-line: #626b63;
+  --nh-doc-hl-line: #ddd7dc;
+  --nh-doc-hl-number-line: #675b66;
 }
 
 /* Match app with no scheme named: the device's. Keep in step with the block above. */
 @media (prefers-color-scheme: light) {
   :where(:root[data-nh-theme='app']:not([data-nh-scheme])) {
     color-scheme: light;
-    --nh-doc-ground: #f4f5f1;
-    --nh-doc-text: #1b1f1c;
-    --nh-doc-muted: #5c645d;
-    --nh-doc-code-bg: #e6e9e0;
-    --nh-doc-rule: #b9bfb5;
-    --nh-doc-line: #dde0d9;
-    --nh-doc-link: #4a6200;
-    --nh-doc-accent: #4a6200;
+    --nh-doc-ground: #f6f4f6;
+    --nh-doc-text: #1e1820;
+    --nh-doc-muted: #5b4f5a;
+    --nh-doc-code-bg: #ebe7eb;
+    --nh-doc-rule: #bfb6bd;
+    --nh-doc-line: #ddd7dc;
+    --nh-doc-link: #b0156c;
+    --nh-doc-accent: #b0156c;
     --nh-doc-image-outline: oklch(0 0 0 / 0.1);
     --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
     --nh-doc-hl-keyword: #cf222e;
@@ -158,8 +158,8 @@
     --nh-doc-hl-error: #82071e;
     --nh-doc-hl-error-text: #f6f8fa;
     --nh-doc-hl-error-bg: #82071e;
-    --nh-doc-hl-line: #dde0d9;
-    --nh-doc-hl-number-line: #626b63;
+    --nh-doc-hl-line: #ddd7dc;
+    --nh-doc-hl-number-line: #675b66;
   }
 }
 

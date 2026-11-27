@@ -229,7 +229,7 @@
   .card :global(.answers button.primary) {
     border: 0;
     background: var(--nh-accent);
-    color: var(--pwa-accent-ink);
+    color: var(--nh-accent-ink);
   }
 
   .card :global(.answers button.always) {

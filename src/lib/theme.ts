@@ -34,7 +34,7 @@ function writeStored(appearance: Appearance) {
 }
 
 /** The browser's theme-color in each scheme: the app's ground (app.html has the same). */
-export const themeColors = { dark: '#0f1210', light: '#f4f5f1' } as const;
+export const themeColors = { dark: '#111013', light: '#f6f4f6' } as const;
 
 // app.html has a theme-color meta for each scheme, keyed by its media query. Light or dark sets
 // both to that scheme's colour, so the browser's bars follow the app, not the device; system gives

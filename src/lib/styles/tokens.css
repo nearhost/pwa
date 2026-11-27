@@ -1,5 +1,6 @@
 /*
- * Nearhost brand tokens: a copy of nearhost/landing src/styles/tokens.css at commit 53ed0c68.
+ * Nearhost brand tokens: a copy of nearhost/landing src/styles/tokens.css on its rebrand/5-fixes branch (f6c6b8f9; the
+ * magenta-on-neutral rebrand, 2026-11-27).
  * Changes from that copy, all below the landing's own blocks or in place of its light selector:
  * - Light applies under prefers-color-scheme: light unless <html> carries data-theme="dark", and
  *   always under data-theme="light" (the app's appearance setting; see #lib/theme). The landing
@@ -7,8 +8,6 @@
  * - color-scheme follows the theme, so form controls and scrollbars match.
  * - The web app's --pwa-* tokens (the canvas's dark and light themes).
  */
-
-/* Nearhost brand tokens. Dark is the default; light applies under Starlight's data-theme. */
 
 /*
  * Arial and Courier New (or their metric twins, Liberation Sans and Mono) scaled to each web font's metrics, so text
@@ -42,18 +41,18 @@
 }
 
 :root {
-  --nh-ground: #0f1210;
-  --nh-surface: #161a17;
-  --nh-raised: #1d221e;
-  --nh-line: #2a312b;
-  --nh-text: #ecefe8;
-  --nh-body: #c5ccc6;
-  --nh-muted: #a4ada5;
+  --nh-ground: #111013;
+  --nh-surface: #19171c;
+  --nh-raised: #231f27;
+  --nh-line: #2f2a33;
+  --nh-text: #f4eef2;
+  --nh-body: #d9ccd5;
+  --nh-muted: #b9a8b4;
   /* The quietest text colour that still reads at 4.5:1 on the ground, surface and raised. */
-  --nh-faint: #818a82;
-  --nh-accent: #d6f26b;
-  --nh-accent-ink: #0f1210;
-  --nh-mark-arch: var(--nh-accent);
+  --nh-faint: #a08f9b;
+  --nh-accent: #ff70c8;
+  --nh-accent-ink: #111013;
+  --nh-mark-chevron: var(--nh-accent);
   --nh-mark-dot: var(--nh-text);
 
   --nh-running: #7fdb8a;
@@ -78,44 +77,38 @@
   color-scheme: dark;
 
   /* Web app additions: dark. */
-  --pwa-accent-ink: #0f1210;
-  --pwa-mark-arch: #d6f26b;
-  --pwa-mark-dot: #ecefe8;
   --pwa-running: #7fdb8a;
   --pwa-running-bg: #1c2e1f;
   --pwa-starting: #f2c14e;
   --pwa-warn-bg: #2a2614;
   --pwa-warn-line: #5c4e1c;
   --pwa-warn-body: #cfc7a8;
-  --pwa-on-warn: #0f1210;
+  --pwa-on-warn: #111013;
   --pwa-failed: #f27d72;
   --pwa-failed-line: #5a2e2a;
-  --pwa-overlay: rgba(6, 8, 7, 0.72);
+  --pwa-overlay: rgba(8, 6, 9, 0.72);
   --pwa-card: 0 0 0 1px oklch(1 0 0 / 0.07);
 }
 
 /* Light: the system scheme, unless the appearance setting says dark. Keep in step below. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
-    --nh-ground: #f4f5f1;
+    --nh-ground: #f6f4f6;
     --nh-surface: #ffffff;
-    --nh-raised: #e6e9e0;
-    --nh-line: #dde0d9;
-    --nh-text: #1b1f1c;
-    --nh-body: #3e463f;
-    --nh-muted: #5c645d;
-    --nh-faint: #626b63;
-    --nh-accent: #4a6200;
+    --nh-raised: #ebe7eb;
+    --nh-line: #ddd7dc;
+    --nh-text: #1e1820;
+    --nh-body: #40363f;
+    --nh-muted: #5b4f5a;
+    --nh-faint: #675b66;
+    --nh-accent: #b0156c;
     --nh-accent-ink: #ffffff;
-    --nh-mark-arch: var(--nh-text);
-    --nh-mark-dot: #d6f26b;
+    --nh-mark-chevron: var(--nh-text);
+    --nh-mark-dot: var(--nh-accent);
 
     color-scheme: light;
 
     /* Web app additions: light. */
-    --pwa-accent-ink: #ffffff;
-    --pwa-mark-arch: #1b1f1c;
-    --pwa-mark-dot: #d6f26b;
     --pwa-running: #2f7a3b;
     --pwa-running-bg: #e3f2e2;
     --pwa-starting: #8f6300;
@@ -125,32 +118,29 @@
     --pwa-on-warn: #ffffff;
     --pwa-failed: #b3362b;
     --pwa-failed-line: #efc7c2;
-    --pwa-overlay: rgba(27, 31, 28, 0.42);
+    --pwa-overlay: rgba(30, 24, 32, 0.42);
     --pwa-card: 0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.06);
   }
 }
 
 /* Light: the appearance setting. Keep in step with the block above. */
 :root[data-theme='light'] {
-  --nh-ground: #f4f5f1;
+  --nh-ground: #f6f4f6;
   --nh-surface: #ffffff;
-  --nh-raised: #e6e9e0;
-  --nh-line: #dde0d9;
-  --nh-text: #1b1f1c;
-  --nh-body: #3e463f;
-  --nh-muted: #5c645d;
-  --nh-faint: #626b63;
-  --nh-accent: #4a6200;
+  --nh-raised: #ebe7eb;
+  --nh-line: #ddd7dc;
+  --nh-text: #1e1820;
+  --nh-body: #40363f;
+  --nh-muted: #5b4f5a;
+  --nh-faint: #675b66;
+  --nh-accent: #b0156c;
   --nh-accent-ink: #ffffff;
-  --nh-mark-arch: var(--nh-text);
-  --nh-mark-dot: #d6f26b;
+  --nh-mark-chevron: var(--nh-text);
+  --nh-mark-dot: var(--nh-accent);
 
   color-scheme: light;
 
   /* Web app additions: light. */
-  --pwa-accent-ink: #ffffff;
-  --pwa-mark-arch: #1b1f1c;
-  --pwa-mark-dot: #d6f26b;
   --pwa-running: #2f7a3b;
   --pwa-running-bg: #e3f2e2;
   --pwa-starting: #8f6300;
@@ -160,6 +150,6 @@
   --pwa-on-warn: #ffffff;
   --pwa-failed: #b3362b;
   --pwa-failed-line: #efc7c2;
-  --pwa-overlay: rgba(27, 31, 28, 0.42);
+  --pwa-overlay: rgba(30, 24, 32, 0.42);
   --pwa-card: 0 0 0 1px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.06);
 }

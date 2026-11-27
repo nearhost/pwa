@@ -211,7 +211,7 @@
     height: 44px;
     border-radius: var(--nh-radius-m);
     background: var(--nh-accent);
-    color: var(--pwa-accent-ink);
+    color: var(--nh-accent-ink);
     font-weight: 600;
     text-decoration: none;
     transition:

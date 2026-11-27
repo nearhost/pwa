@@ -137,7 +137,7 @@
     border: 0;
     border-radius: var(--nh-radius-m);
     background: var(--nh-accent);
-    color: var(--pwa-accent-ink);
+    color: var(--nh-accent-ink);
     font: inherit;
     font-weight: 600;
   }

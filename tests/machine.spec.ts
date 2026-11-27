@@ -10,8 +10,8 @@ const appVersion = (
   }
 ).version;
 
-const grounds = { dark: 'rgb(15, 18, 16)', light: 'rgb(244, 245, 241)' } as const;
-const themeColors = { dark: '#0f1210', light: '#f4f5f1' } as const;
+const grounds = { dark: 'rgb(17, 16, 19)', light: 'rgb(246, 244, 246)' } as const;
+const themeColors = { dark: '#111013', light: '#f6f4f6' } as const;
 
 // Playwright cannot emulate display-mode: this makes the app's matchMedia query match, as in
 // shell.spec.ts.

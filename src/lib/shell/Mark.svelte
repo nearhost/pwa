@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The Nearhost mark (landing/brand/nearhost-mark-on-*.svg), coloured by the theme's tokens.
+  // The Nearhost mark (landing/brand/nearhost-mark-on-*.svg: a prompt, a chevron pointing at a dot), coloured by the theme's tokens.
   let { size = 24 }: { size?: number } = $props();
 </script>
 
@@ -12,13 +12,14 @@
   focusable="false"
 >
   <path
-    d="M14 56V32a18 18 0 0 1 36 0v24"
+    d="M13 17l15 15-15 15"
     fill="none"
-    stroke="var(--pwa-mark-arch)"
-    stroke-width="11"
+    stroke="var(--nh-mark-chevron)"
+    stroke-width="8"
     stroke-linecap="round"
+    stroke-linejoin="round"
   />
-  <circle cx="32" cy="48" r="6" fill="var(--pwa-mark-dot)" />
+  <circle cx="46" cy="44" r="7.5" fill="var(--nh-mark-dot)" />
 </svg>
 
 <style>
