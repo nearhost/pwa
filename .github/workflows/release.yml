@@ -1,0 +1,56 @@
+name: release
+# Push a build/vX.Y.Z tag to release X.Y.Z: the workflow builds the app, commits dist/ and
+# version.go in a release commit (not on main), tags it vX.Y.Z (the Go module version) and
+# creates a GitHub release. workflow_dispatch with dry_run (the default) builds and tests
+# without pushing the tag or creating a release.
+on:
+  push:
+    tags: ['build/v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Source tag to release from, e.g. build/v0.1.0
+        required: true
+      dry_run:
+        description: Build and test only; push no tag and create no release
+        type: boolean
+        default: true
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: 1.27.x
+      - name: Check the tag
+        run: |
+          [[ "$TAG" =~ ^build/v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad tag: $TAG" >&2; exit 1; }
+      - name: Build, test and tag
+        run: |
+          flag=""
+          [ "$DRY_RUN" = "true" ] && flag="--dry-run"
+          scripts/release.sh "${TAG#build/v}" $flag
+      - name: Create the GitHub release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${TAG#build/v}"
+          gh release create "v$version" --verify-tag --title "v$version" \
+            --notes "The Nearhost web app $version as a Go module: \`go get github.com/nearhost/pwa@v$version\`."
