@@ -49,7 +49,7 @@
     <section class="waiting" id="waiting" aria-labelledby="waiting-heading">
       <h2 id="waiting-heading" class="visually-hidden">Waiting for you</h2>
       {#each waiting as item (item.key)}
-        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- built from resolve's base by waitingItems -->
+        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- waitingItems gives the app's own paths; the app is served at the root -->
         <a href={item.href}>
           <span class="clock"><Icon name="waiting" size={24} stroke={2} /></span>
           <span class="what">{item.text}</span>
@@ -117,6 +117,11 @@
 
   .search:focus-within {
     border-color: var(--nh-accent);
+  }
+
+  .search:has(input:focus-visible) {
+    outline: 2px solid var(--nh-accent);
+    outline-offset: 2px;
   }
 
   .search input {

@@ -125,6 +125,13 @@ describe('addressOf', () => {
     expect(addressOf({ ...route, networkUrl: undefined }, true)).toBe('https://shop.test');
   });
 
+  it('is undefined for an address that is not http or https', () => {
+    expect(addressOf({ ...route, networkUrl: 'javascript:alert(1)' }, true)).toBeUndefined();
+    expect(addressOf({ ...route, url: 'data:text/html,x' }, false)).toBeUndefined();
+    expect(addressOf({ ...route, url: 'not a url' }, false)).toBeUndefined();
+    expect(addressOf({ ...route, url: 'http://shop.test' }, false)).toBe('http://shop.test');
+  });
+
   it('is undefined without a route', () => {
     expect(addressOf(undefined, true)).toBeUndefined();
   });

@@ -10,11 +10,29 @@
     controls,
   }: { routes: SiteRoute[]; selected: number; controls: string } = $props();
 
+  let tablist = $state<HTMLDivElement>();
+
+  // The tabs pattern: arrows move to the previous or next route (wrapping), Home and End to the
+  // first and last; the route follows the focus.
+  function onkeydown(event: KeyboardEvent) {
+    const last = routes.length - 1;
+    const next = {
+      ArrowRight: selected >= last ? 0 : selected + 1,
+      ArrowLeft: selected <= 0 ? last : selected - 1,
+      Home: 0,
+      End: last,
+    }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    selected = next;
+    tablist?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+  }
+
   const labels = $derived(routes.map((r) => routeLabel(r.host, routes[0]?.host ?? '')));
 </script>
 
 {#if routes.length > 1}
-  <div class="tabs" role="tablist" aria-label="Routes">
+  <div class="tabs" role="tablist" aria-label="Routes" bind:this={tablist}>
     {#each labels as label, i (routes[i].host)}
       <button
         type="button"
@@ -22,6 +40,7 @@
         aria-selected={selected === i}
         aria-controls={controls}
         tabindex={selected === i ? 0 : -1}
+        {onkeydown}
         onclick={() => (selected = i)}
       >
         {label}

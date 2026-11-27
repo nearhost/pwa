@@ -5,7 +5,8 @@
  * Whether address is on another site than the page: on a networked core the page is
  * nearhost.<domain> and a project's names under that domain are its own; an alias outside it is
  * another site, where the browser keeps the project's cookies from the frame. Off a networked
- * name no domain is known, so nothing is taken to be cross-site.
+ * name no domain is known, so no http or https address is taken to be cross-site. An address
+ * of any other kind always is, so it is never framed.
  */
 export function isCrossSite(address: string, pageHost: string): boolean {
   const domain = pageHost.toLowerCase().startsWith('nearhost.')
@@ -13,7 +14,9 @@ export function isCrossSite(address: string, pageHost: string): boolean {
     : undefined;
   let host: string;
   try {
-    host = new URL(address).hostname.toLowerCase();
+    const url = new URL(address);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return true;
+    host = url.hostname.toLowerCase();
   } catch {
     return true;
   }

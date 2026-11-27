@@ -48,5 +48,9 @@ describe('device settings', () => {
     expect(openProjectsIn()).toBe('app');
     expect(alwaysBrowser('shop')).toBe(false);
     expect(() => setAlwaysBrowser('shop', true)).not.toThrow();
+    // Kept for the session instead.
+    expect(alwaysBrowser('shop')).toBe(true);
+    setAlwaysBrowser('shop', false);
+    expect(alwaysBrowser('shop')).toBe(false);
   });
 });

@@ -83,6 +83,34 @@ for (const size of sizes) {
         });
       }
 
+      if (!phone) {
+        test('the keyboard reaches every route with the arrow keys, Home and End', async ({
+          page,
+        }) => {
+          await fakeApi(page, { state: canvas });
+          await serveSites(page);
+          await page.goto('/projects/storefront');
+          const tabs = page.getByRole('tablist', { name: 'Routes' });
+          const tab = (name: string) => tabs.getByRole('tab', { name, exact: true });
+          const frame = page.locator('iframe[data-preview]');
+          await tab('storefront').focus();
+          await page.keyboard.press('ArrowRight');
+          await expect(tab('mail.storefront')).toBeFocused();
+          await expect(tab('mail.storefront')).toHaveAttribute('aria-selected', 'true');
+          await expect(frame).toHaveAttribute('src', 'https://mail.storefront.lab.example.dev');
+          await page.keyboard.press('End');
+          await expect(tab('vite.storefront')).toBeFocused();
+          await page.keyboard.press('ArrowRight');
+          await expect(tab('storefront')).toBeFocused();
+          await page.keyboard.press('ArrowLeft');
+          await expect(tab('vite.storefront')).toBeFocused();
+          await page.keyboard.press('Home');
+          await expect(tab('storefront')).toBeFocused();
+          await expect(tab('storefront')).toHaveAttribute('aria-selected', 'true');
+          await expect(frame).toHaveAttribute('src', 'https://storefront.lab.example.dev');
+        });
+      }
+
       test("a page that never loads shows that it didn't load in the frame", async ({ page }) => {
         await page.clock.install();
         await fakeApi(page, { state: canvas });

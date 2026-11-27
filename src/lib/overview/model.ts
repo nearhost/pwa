@@ -70,10 +70,25 @@ export function filterGroups(groups: MachineGroup[], query: string): MachineGrou
     .filter((g) => g.projects.length > 0);
 }
 
-/** Where a route opens: its network address on a networked core, else its local one. */
+/** Whether address is an http or https address, the only kind the app opens or frames. */
+export function isWebAddress(address: string | undefined): address is string {
+  if (!address) return false;
+  try {
+    const { protocol } = new URL(address);
+    return protocol === 'https:' || protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where a route opens: its network address on a networked core, else its local one; undefined
+ * for one that is not an http or https address.
+ */
 export function addressOf(route: SiteRoute | undefined, networked: boolean): string | undefined {
   if (!route) return undefined;
-  return (networked && route.networkUrl) || route.url;
+  const address = (networked && route.networkUrl) || route.url;
+  return isWebAddress(address) ? address : undefined;
 }
 
 /** Where Preview goes: the app's preview, or the browser when the device or project says so. */

@@ -16,8 +16,10 @@ describe('isCrossSite', () => {
     expect(isCrossSite('https://shop.test/', 'localhost')).toBe(false);
   });
 
-  it('is true for an address that is not one', () => {
+  it('is true for an address that is not an http or https one, wherever the page is', () => {
     expect(isCrossSite('not a url', 'nearhost.lab.example.dev')).toBe(true);
+    expect(isCrossSite('javascript:alert(1)', 'localhost')).toBe(true);
+    expect(isCrossSite('data:text/html,x', 'nearhost.lab.example.dev')).toBe(true);
   });
 });
 

@@ -171,6 +171,60 @@ for (const size of sizes) {
   }
 }
 
+test.describe('on a phone', () => {
+  for (const scheme of schemes) {
+    test.describe(scheme, () => {
+      test.use({ viewport: sizes[2].viewport, colorScheme: scheme });
+
+      test("each row shows its project's state, to the eye and to assistive tech", async ({
+        page,
+      }) => {
+        await fakeApi(page, {
+          state: {
+            ...canvas,
+            projects: { ...canvas.projects, api: project('error', { Message: 'exited' }) },
+          },
+        });
+        await page.goto('/');
+        const expected = {
+          storefront: ['Running', '--pwa-running'],
+          admin: ['Stopped', '--nh-muted'],
+          worker: ['Starting', '--pwa-starting'],
+          api: ['Error', '--pwa-failed'],
+        } as const;
+        for (const [name, [label, token]] of Object.entries(expected)) {
+          const card = page.locator('main').getByRole('article', { name });
+          const dot = card.locator('[data-state-dot]').first();
+          const box = (await dot.boundingBox())!;
+          expect(box.width).toBe(8);
+          expect(box.height).toBe(8);
+          const colour = await dot.evaluate(
+            (el, { token, hollow }) => {
+              const style = getComputedStyle(el);
+              const want = getComputedStyle(document.documentElement)
+                .getPropertyValue(token)
+                .trim();
+              const probe = document.createElement('span');
+              probe.style.color = want;
+              document.body.append(probe);
+              const resolved = getComputedStyle(probe).color;
+              probe.remove();
+              const shown = hollow ? style.borderTopColor : style.backgroundColor;
+              return { shown, resolved };
+            },
+            { token, hollow: name === 'admin' },
+          );
+          expect(colour.shown).toBe(colour.resolved);
+          // The state in words, for a screen reader: present, not hidden from it.
+          const words = card.getByText(label, { exact: true });
+          await expect(words).toBeVisible();
+          expect(await words.evaluate((el) => !!el.closest('[aria-hidden="true"]'))).toBe(false);
+        }
+      });
+    });
+  }
+});
+
 test.describe('open projects in the browser', () => {
   test.use({ viewport: sizes[0].viewport });
 

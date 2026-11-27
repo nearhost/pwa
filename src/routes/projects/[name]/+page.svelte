@@ -8,7 +8,7 @@
   import Icon from '#lib/ui/Icon.svelte';
   import StartStop from '#lib/ui/StartStop.svelte';
   import { addressOf, stateLabel } from '#lib/overview/model.js';
-  import { projectActions } from '#lib/overview/actions.svelte.js';
+  import { actionError } from '#lib/overview/actions.svelte.js';
   import { projectLogs } from '#lib/preview/logs.svelte.js';
   import { frameWidths, isCrossSite, type FrameWidth } from '#lib/preview/model.js';
   import PreviewFrame from '#lib/preview/PreviewFrame.svelte';
@@ -39,7 +39,7 @@
   const address = $derived(addressOf(route, networked));
   const crossSite = $derived(address ? isCrossSite(address, page.url.hostname) : false);
   const framed = $derived(status?.State === 'running' || status?.State === 'degraded');
-  const error = $derived(projectActions.errors[name]);
+  const error = $derived(status ? actionError(name, status.State) : undefined);
 </script>
 
 <div class="preview">
@@ -94,7 +94,9 @@
       <div class="panel">
         <h2>{status.State === 'stopped' ? `${name} is stopped` : `${name} isn't running`}</h2>
         {#if status.Message}<p>{status.Message}</p>{/if}
-        <span class="start"><StartStop {name} running={false} {live} label /></span>
+        <span class="start">
+          <StartStop {name} state={status.State} running={false} {live} label />
+        </span>
         {#if error}<p class="error" role="alert">{error}</p>{/if}
       </div>
     {:else if !address}

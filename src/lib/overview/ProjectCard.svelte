@@ -5,7 +5,7 @@
   import StartStop from '#lib/ui/StartStop.svelte';
   import StateDot from '#lib/ui/StateDot.svelte';
   import { alwaysBrowser, openProjectsIn } from '#lib/settings.js';
-  import { projectActions } from './actions.svelte.js';
+  import { actionError } from './actions.svelte.js';
   import { addressOf, hostOf, previewLink, stateLabel, type ProjectView } from './model.js';
 
   let { project, networked, live }: { project: ProjectView; networked: boolean; live: boolean } =
@@ -30,7 +30,7 @@
           ? `port ${project.routes[0].port}`
           : `${count} routes`),
   );
-  const error = $derived(projectActions.errors[project.name]);
+  const error = $derived(actionError(project.name, state));
 </script>
 
 <!-- eslint-disable svelte/no-navigation-without-resolve -- the links go to previewLink's app path or to the project's own address -->
@@ -77,7 +77,7 @@
         </a>
       {/if}
     {/if}
-    <StartStop name={project.name} {running} {live} label={!running} />
+    <StartStop name={project.name} {state} {running} {live} label={!running} />
   </div>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 </article>
@@ -278,9 +278,19 @@
       display: block;
     }
 
-    .pill,
     .preview {
       display: none;
+    }
+
+    /* The dot shows the state; the words stay for assistive tech. */
+    .pill {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
 
     h3 {

@@ -61,10 +61,11 @@
   }
 
   .connection[data-connection='live'] {
-    color: var(--nh-running);
+    /* The web app's tokens: readable on the header in both schemes (5.3:1 and more). */
+    color: var(--pwa-running);
   }
 
   .connection[data-connection='lost'] {
-    color: var(--nh-failed);
+    color: var(--pwa-failed);
   }
 </style>

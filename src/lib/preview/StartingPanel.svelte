@@ -26,7 +26,7 @@
   <div class="status" role="status">
     <h2><span class="spinner" aria-hidden="true"></span>Starting {name}</h2>
     <p>
-      {#if said}{said.replace(/\.?$/, '.')}{/if} The site opens here by itself when it answers.
+      {#if said}{said.replace(/\.?$/, '.')}{/if} The site opens here by itself when it does.
     </p>
   </div>
   {#if routes.length > 0}

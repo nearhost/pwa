@@ -5,10 +5,12 @@
   let { state, size = 8 }: { state: EngineState; size?: number } = $props();
 </script>
 
-<span class="dot" data-state={state} style:--size="{size}px" aria-hidden="true"></span>
+<span class="dot" data-state-dot data-state={state} style:--size="{size}px" aria-hidden="true"
+></span>
 
 <style>
   .dot {
+    display: inline-block;
     flex: none;
     width: var(--size);
     height: var(--size);

@@ -3,14 +3,18 @@
   // state turns it from one to the other. Busy while the ask is out; off with the connection.
   import Icon from './Icon.svelte';
   import { projectActions, startStop } from '#lib/overview/actions.svelte.js';
+  import type { EngineState } from '#lib/overview/model.js';
 
   let {
     name,
+    state,
     running,
     live,
     label = false,
   }: {
     name: string;
+    /** The project's state now, which an error from this ask belongs to. */
+    state: EngineState;
     /** Stop when true, start when false. */
     running: boolean;
     live: boolean;
@@ -30,7 +34,7 @@
   aria-busy={busy}
   aria-describedby={live ? undefined : 'connection-reason'}
   disabled={!live || busy}
-  onclick={() => startStop(name, running ? 'stop' : 'start')}
+  onclick={() => startStop(name, running ? 'stop' : 'start', state)}
 >
   <span class="icons">
     <span class="icon start"><Icon name="start" size={16} /></span>
