@@ -3,7 +3,7 @@
   // does, and what is served now against what the change serves, with Approve and Decline sent
   // with the change's SHA-256. It follows the state: a change answered elsewhere says it is no
   // longer waiting; one the file replaced while open says so and shows the new one.
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { resolve } from '$app/paths';
   import ConnectionNotice from '#lib/shell/ConnectionNotice.svelte';
   import { apiClient, appState } from '#lib/state.svelte.js';
@@ -38,14 +38,19 @@
   const off = $derived(!live || busy);
   const describedBy = $derived(live ? undefined : 'connection-reason');
 
-  function send(which: 'accept' | 'decline') {
+  let result: HTMLElement | undefined = $state();
+
+  // Sends the answer, then takes the focus to what came of it.
+  async function send(which: 'accept' | 'decline') {
     const sha = pending?.SHA256;
     if (!sha) return;
-    void answering.send(which, () =>
+    await answering.send(which, () =>
       which === 'accept'
         ? apiClient().send('POST', '/v1/projects/{name}/change/accept', { sha }, { name })
         : apiClient().send('POST', '/v1/projects/{name}/change/decline', { sha }, { name }),
     );
+    await tick();
+    result?.focus();
   }
 </script>
 
@@ -58,7 +63,7 @@
       level={2}
       title={[answering.done === 'accept' ? 'Approved' : 'Declined']}
     >
-      <p class="done" role="status">
+      <p class="done" role="status" tabindex="-1" bind:this={result}>
         {answering.done === 'accept'
           ? 'Approved what .nearhostrc asks for.'
           : `Declined. ${name} keeps serving what was approved before.`}
@@ -113,13 +118,13 @@
       {/if}
       {#if view.diff.length > 0}
         <div class="block">
-          <h3>What it serves</h3>
-          <ul class="diff" aria-label="Served now and after the change">
+          <h3>What it serves after the change</h3>
+          <ul class="diff" aria-label="What it serves after the change">
             {#each view.diff as line, i (i)}
               <li data-sign={line.sign}>
                 <span class="sign" aria-hidden="true">{line.sign === ' ' ? '' : line.sign}</span>
                 <span class="visually-hidden">
-                  {line.sign === '+' ? 'Added: ' : line.sign === '-' ? 'Removed: ' : 'Kept: '}
+                  {line.sign === '+' ? 'New: ' : line.sign === '-' ? 'No longer served: ' : ''}
                 </span><bdi>{line.text}</bdi>
               </li>
             {/each}
@@ -127,7 +132,9 @@
         </div>
       {/if}
       {#if answering.failure}
-        <p class="problem" role="alert">{answering.failure.text}</p>
+        <p class="problem" role="alert" tabindex="-1" bind:this={result}>
+          {answering.failure.text}
+        </p>
       {/if}
       <div class="answers" data-answers>
         <div class="row">
@@ -151,6 +158,7 @@
             Decline
           </button>
         </div>
+        {#if answering.busy}<p class="sending">Sending…</p>{/if}
       </div>
     </RequestCard>
   {/if}
@@ -250,5 +258,10 @@
 
   .diff li[data-sign='-'] {
     color: var(--pwa-failed);
+    text-decoration: line-through;
+  }
+
+  .change :global([tabindex='-1']:focus) {
+    outline: none;
   }
 </style>

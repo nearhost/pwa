@@ -149,8 +149,6 @@
 
   .card :global(.fields dd) {
     min-width: 0;
-    max-height: 12em;
-    overflow: auto;
     overflow-wrap: anywhere;
   }
 
@@ -259,6 +257,13 @@
   .card :global(.answers button:focus-visible) {
     outline: 2px solid var(--nh-accent);
     outline-offset: 2px;
+  }
+
+  .card :global(.sending) {
+    margin: 0;
+    color: var(--nh-muted);
+    font-size: 14px;
+    text-align: center;
   }
 
   .card :global(.problem) {

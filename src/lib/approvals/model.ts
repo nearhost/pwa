@@ -85,57 +85,67 @@ export interface Field {
 }
 
 export interface ProposalView {
-  kind: 'project' | 'server';
   title: Segment[];
   intro: Segment[];
-  /** The name to accept it as, until the user changes it. */
-  name: string;
   fields: Field[];
-  note: string;
+  notes: Segment[][];
+  /** Its origin is a server Nearhost no longer has, so it can only be declined. */
+  removed: boolean;
   waits: string;
 }
 
 /**
- * An agent's proposal to add a project: on this machine or a server Nearhost has, a project; on a
- * machine Nearhost does not have, that machine as a server first.
+ * An agent's proposal to add a project, on this machine (origin "local") or on a server Nearhost
+ * has. An origin that is neither is a server removed while its proposal waited. The app can't add
+ * projects yet (the core's accept only tells the agent it was saved), so it can only be declined
+ * here; the note says where to add it.
  */
 export function proposalView(p: Proposal, ctx: Context): ProposalView {
   const where = originName(p.Origin, ctx);
   const local = where === ctx.machine;
+  const removed = !local && !ctx.servers.includes(p.Origin);
   const name = p.Name || baseName(p.Path);
-  const server = !local && !ctx.servers.includes(p.Origin);
   const fields: Field[] = [
     { label: 'Folder', value: [mono(p.Path)] },
     {
       label: 'Serves',
       value: p.Web > 0 ? [mono(`port ${p.Web}`)] : ['The port it finds when it starts'],
     },
-    { label: 'Runs on', value: local ? [`${ctx.machine}, this machine`] : [q(where)] },
+    {
+      label: 'Runs on',
+      value: local
+        ? [`${ctx.machine}, this machine`]
+        : removed
+          ? [q(where), ', which is no longer in Nearhost']
+          : [q(where)],
+    },
   ];
-  if (server) {
-    return {
-      kind: 'server',
-      title: ['Add ', q(where), ' as a server?'],
-      intro: [
-        'An agent on ',
-        q(where),
-        ' asked, so it can serve ',
-        q(name),
-        ` there through ${ctx.machine}.`,
-      ],
-      name,
-      fields,
-      note: `Nothing runs until you say yes.`,
-      waits: waitsText(p.Expires, ctx.now),
-    };
-  }
+  const notes: Segment[][] = removed
+    ? [
+        [
+          q(where),
+          ' is no longer in Nearhost, so this project can’t be added. Decline it to tell the agent.',
+        ],
+      ]
+    : [
+        [
+          `Adding projects from the app comes next. To add it now, use Nearhost on ${ctx.machine}, or decline it here.`,
+        ],
+      ];
   return {
-    kind: 'project',
     title: ['Add ', q(name), ' to Nearhost?'],
-    intro: ['An agent, working in ', mono(p.Path), ' on ', q(where), ', asked.'],
-    name,
+    intro: removed
+      ? [
+          'An agent, working in ',
+          mono(p.Path),
+          ' on ',
+          q(where),
+          ', which is no longer in Nearhost, asked.',
+        ]
+      : ['An agent, working in ', mono(p.Path), ' on ', q(where), ', asked.'],
     fields,
-    note: `Nothing runs until you say yes. The project runs on ${local ? ctx.machine : 'that server'} as your user, in that folder, whenever it starts.`,
+    notes,
+    removed,
     waits: waitsText(p.Expires, ctx.now),
   };
 }
@@ -249,7 +259,10 @@ export interface ChangeView {
   intro: string;
   /** What needs approval, each with why. */
   items: { what: Segment[]; why: string }[];
-  /** What is served now against what the change serves. */
+  /**
+   * What the change serves, and what it no longer serves: + for what is surely new, - for what is
+   * surely gone, ' ' for what it serves where the state can't tell whether that is new.
+   */
   diff: DiffLine[];
 }
 
@@ -276,12 +289,17 @@ function servedBy(routes: ConfigRoute[], alias: string): { host: string; port: n
 }
 
 /**
- * The change a project's .nearhostrc asks for: what needs approval, and the hosts served now
- * against those served after it (removed, kept, added), with its loopback ports.
+ * The change a project's .nearhostrc asks for: what needs approval (the core's items, the main
+ * content), and what it serves after, with its loopback ports.
  */
 export function changeView(name: string, change: Change, current: SiteRoute[]): ChangeView {
   const next = change.Project.Routes ?? [];
   const after = servedBy(next, change.Project.Alias);
+  const asked = change.Items ?? [];
+  // The state has only each web route's main name now, so only what is sure is marked: a host the
+  // change no longer serves at all, and a host or loopback port that is new because the change
+  // adds its port or asks approval for it. Everything else it serves is listed unmarked.
+  const ports = new Set(current.map((r) => r.port));
   const diff: DiffLine[] = [];
   for (const r of current) {
     if (!after.some((a) => a.host === r.host && a.port === r.port)) {
@@ -289,16 +307,17 @@ export function changeView(name: string, change: Change, current: SiteRoute[]): 
     }
   }
   for (const a of after) {
-    const kept = current.some((r) => r.host === a.host && r.port === a.port);
-    diff.push({ sign: kept ? ' ' : '+', text: `${a.host} → port ${a.port}` });
+    const isNew =
+      !ports.has(a.port) || asked.some((it) => it.Host === a.host && it.Port === a.port);
+    diff.push({ sign: isNew ? '+' : ' ', text: `${a.host} → port ${a.port}` });
   }
   for (const r of next) {
-    if (r.Role === 'loopback') {
-      diff.push({
-        sign: ' ',
-        text: `localhost:${r.Port} (loopback${r.Label ? `, ${r.Label}` : ''})`,
-      });
-    }
+    if (r.Role !== 'loopback') continue;
+    const isNew = asked.some((it) => it.Option === 'loopback' && it.Port === r.Port);
+    diff.push({
+      sign: isNew ? '+' : ' ',
+      text: `localhost:${r.Port} (loopback${r.Label ? `, ${r.Label}` : ''})`,
+    });
   }
   const items = (change.Items ?? []).map((it) => ({ what: itemWhat(it), why: it.Why }));
   return {
@@ -313,7 +332,7 @@ export function changeView(name: string, change: Change, current: SiteRoute[]): 
 export interface WaitingView {
   key: string;
   href: string;
-  kind: 'project' | 'server' | 'pass' | 'doc' | 'change';
+  kind: 'proposal' | 'pass' | 'doc' | 'change';
   headline: Segment[];
   detail: Segment[];
 }
@@ -325,15 +344,21 @@ export function waitingView(a: Approval, ctx: Context): WaitingView {
     const p = a.proposal;
     const view = proposalView(p, ctx);
     const where = originName(p.Origin, ctx);
+    const name = p.Name || baseName(p.Path);
     const serving = p.Web > 0 ? `, serving port ${p.Web}` : '';
     return {
       key: a.id,
       href,
-      kind: view.kind,
-      headline:
-        view.kind === 'server'
-          ? ['An agent wants to add ', q(where), ' as a server']
-          : ['An agent wants to add ', q(view.name), ' on ', q(where)],
+      kind: 'proposal',
+      headline: view.removed
+        ? [
+            'An agent wants to add ',
+            q(name),
+            ' from ',
+            q(where),
+            ', which is no longer in Nearhost',
+          ]
+        : ['An agent wants to add ', q(name), ' on ', q(where)],
       detail: ['From ', mono(p.Path), `${serving}. ${view.waits}`],
     };
   }

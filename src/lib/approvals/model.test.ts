@@ -91,37 +91,51 @@ describe('words', () => {
 });
 
 describe('a proposal', () => {
-  it('on this machine asks to add the project, with its folder and port', () => {
+  it('on this machine shows what it asks, and that the app can only decline it yet', () => {
     const v = proposalView(proposal(), ctx);
-    expect(v.kind).toBe('project');
+    expect(v.removed).toBe(false);
     expect(plain(v.title)).toBe('Add billing to Nearhost?');
     expect(plain(v.intro)).toBe('An agent, working in /home/ecs/Code/billing on leto, asked.');
-    expect(v.name).toBe('billing');
     expect(v.fields.map((f) => [f.label, plain(f.value)])).toEqual([
       ['Folder', '/home/ecs/Code/billing'],
       ['Serves', 'port 8000'],
       ['Runs on', 'leto, this machine'],
     ]);
+    expect(v.notes.map(plain)).toEqual([
+      'Adding projects from the app comes next. To add it now, use Nearhost on leto, or decline it here.',
+    ]);
     expect(v.waits).toBe('Waits 4 more minutes.');
+  });
+
+  it('says where to add it when the core gives no machine name', () => {
+    const v = proposalView(proposal(), { ...ctx, machine: 'this machine' });
+    expect(plain(v.notes[0])).toBe(
+      'Adding projects from the app comes next. To add it now, use Nearhost on this machine, or decline it here.',
+    );
   });
 
   it('left to discovery is named after its folder, its port found when it starts', () => {
     const v = proposalView(proposal({ Name: '', Web: 0 }), ctx);
-    expect(v.name).toBe('billing');
+    expect(plain(v.title)).toBe('Add billing to Nearhost?');
     expect(plain(v.fields[1].value)).toBe('The port it finds when it starts');
   });
 
   it('on a server Nearhost has is a project there', () => {
     const v = proposalView(proposal({ Origin: 'build-box', Name: 'api' }), ctx);
-    expect(v.kind).toBe('project');
+    expect(v.removed).toBe(false);
     expect(plain(v.intro)).toBe('An agent, working in /home/ecs/Code/billing on build-box, asked.');
   });
 
-  it('on a machine Nearhost does not have asks to add it as a server', () => {
+  it('from a server no longer in Nearhost says so, and can only be declined', () => {
     const v = proposalView(proposal({ Origin: 'mini', Name: 'api' }), ctx);
-    expect(v.kind).toBe('server');
-    expect(plain(v.title)).toBe('Add mini as a server?');
-    expect(plain(v.intro)).toBe('An agent on mini asked, so it can serve api there through leto.');
+    expect(v.removed).toBe(true);
+    expect(plain(v.intro)).toBe(
+      'An agent, working in /home/ecs/Code/billing on mini, which is no longer in Nearhost, asked.',
+    );
+    expect(plain(v.fields[2].value)).toBe('mini, which is no longer in Nearhost');
+    expect(v.notes.map(plain)).toEqual([
+      'mini is no longer in Nearhost, so this project can’t be added. Decline it to tell the agent.',
+    ]);
   });
 
   it("keeps what the agent wrote apart from the app's words", () => {
@@ -223,13 +237,32 @@ describe("a project's change", () => {
     );
   });
 
-  it('shows what is served now against what it serves after', () => {
+  it('marks only what is sure: hosts no longer served, and new ports or approved hosts', () => {
     expect(changeView('shop', change, current).diff).toEqual([
       { sign: '-', text: 'vite.shop.test → port 5173' },
       { sign: ' ', text: 'shop.test → port 80' },
       { sign: '+', text: 'shop.com → port 80' },
       { sign: '+', text: 'mail.shop.test → port 8025' },
-      { sign: ' ', text: 'localhost:3306 (loopback, mysql)' },
+      { sign: '+', text: 'localhost:3306 (loopback, mysql)' },
+    ]);
+  });
+
+  it("leaves unmarked what the state can't tell is new: another host on a port served now", () => {
+    const quiet = {
+      ...change,
+      Project: {
+        ...change.Project,
+        Routes: [
+          { Port: 80, Role: 'web' as const, Label: '', Hosts: ['www.shop.test'] },
+          { Port: 3307, Role: 'loopback' as const, Label: '', Hosts: null },
+        ],
+      },
+      Items: [],
+    };
+    expect(changeView('shop', quiet, current.slice(0, 1)).diff).toEqual([
+      { sign: ' ', text: 'shop.test → port 80' },
+      { sign: ' ', text: 'www.shop.test → port 80' },
+      { sign: ' ', text: 'localhost:3307 (loopback)' },
     ]);
   });
 });
@@ -267,7 +300,7 @@ describe('what waits', () => {
       [
         'a1',
         '/approve/a1',
-        'project',
+        'proposal',
         'An agent wants to add billing on leto',
         'From /home/ecs/Code/billing, serving port 8000. Waits 4 more minutes.',
       ],
@@ -288,8 +321,8 @@ describe('what waits', () => {
       [
         'a4',
         '/approve/a4',
-        'server',
-        'An agent wants to add mini as a server',
+        'proposal',
+        'An agent wants to add api from mini, which is no longer in Nearhost',
         'From /home/ecs/Code/billing, serving port 8000. Waits 4 more minutes.',
       ],
       [

@@ -9,16 +9,20 @@ import type { State } from '../src/lib/api/types.js';
 // the body the core takes, and the page says what was done.
 const kinds = [
   {
-    name: 'a proposal to add a project',
+    name: 'a proposal to add a project, declined',
     state: { approvals: [requests.proposal('a1')] },
     item: /An agent wants to add billing on leto/,
     path: '/approve/a1',
     heading: 'Add billing to Nearhost?',
-    shows: ['/home/ecs/Code/billing', 'port 8000'],
-    route: 'POST /api/v1/proposals/a1/accept',
-    button: 'Add billing',
-    body: { name: 'billing' },
-    done: 'Accepted. The agent was told to add it as billing.',
+    shows: [
+      '/home/ecs/Code/billing',
+      'port 8000',
+      'Adding projects from the app comes next. To add it now, use Nearhost on leto, or decline it here.',
+    ],
+    route: 'POST /api/v1/proposals/a1/decline',
+    button: 'Decline',
+    body: { reason: '' },
+    done: 'Declined. The agent was told no.',
   },
   {
     name: 'a passthrough request',
@@ -94,10 +98,16 @@ async function answer(page: Page, api: FakeApi, kind: Kind) {
   const release = hold(api, kind.route);
   const buttons = main.locator('[data-answers] button');
   await main.getByRole('button', { name: kind.button }).click();
-  // Every answer is off while one is on its way.
+  // Every answer is off while one is on its way, and the page says it is sending.
   for (const b of await buttons.all()) await expect(b).toBeDisabled();
+  await expect(main.getByText('Sending…')).toBeVisible();
   await release();
   await expect(main.getByRole('status')).toContainText(kind.done);
+  // The focus moves to what came of it.
+  await expect(main.getByRole('status')).toBeFocused();
+  await expect(main.getByText('Sending…')).toHaveCount(0);
+  // The core's proposal accept only tells the agent it was saved: the app never sends it.
+  expect(api.requests.filter((r) => /\/proposals\/[^/]+\/accept$/.test(r.path))).toEqual([]);
   const sent = api.requests.filter((r) => `${r.method} ${r.path}` === kind.route);
   expect(sent).toHaveLength(1);
   expect(sent[0].body).toEqual(kind.body);
@@ -138,29 +148,34 @@ for (const size of sizes) {
         });
       }
 
-      test('a proposal accepted under another name, or declined with a reason', async ({
-        page,
-      }) => {
+      test('a proposal is only declined here, with a reason, never accepted', async ({ page }) => {
         const api = await fakeApi(page, {
-          state: { ...canvas, approvals: [requests.proposal('a1'), requests.proposal('a4')] },
+          state: {
+            ...canvas,
+            approvals: [requests.proposal('a1'), requests.proposal('a4', { Origin: 'mini' })],
+          },
         });
-        api.on('POST /api/v1/proposals/a1/accept', () => ({ status: 204 }));
-        api.on('POST /api/v1/proposals/a4/decline', () => ({ status: 204 }));
+        api.on('POST /api/v1/proposals/a1/decline', () => ({ status: 204 }));
         await page.goto('/approve/a1');
         const main = page.locator('main');
-        const name = main.getByRole('textbox', { name: 'Project name' });
-        await name.fill('');
-        await expect(main.getByRole('button', { name: /^Add/ })).toBeDisabled();
-        await name.fill('billing-app');
-        await main.getByRole('button', { name: 'Add billing-app' }).click();
-        await expect(main.getByRole('status')).toContainText('add it as billing-app');
-
-        await page.goto('/approve/a4');
+        await expect(main.locator('[data-answers] button')).toHaveText(['Decline']);
+        await expect(main.getByRole('textbox', { name: 'Project name' })).toHaveCount(0);
         await main.getByRole('textbox', { name: /Reason/ }).fill('not now');
         await main.getByRole('button', { name: 'Decline' }).click();
         await expect(main.getByRole('status')).toContainText('Declined');
-        const bodies = api.requests.filter((r) => r.method === 'POST').map((r) => r.body);
-        expect(bodies).toEqual([{ name: 'billing-app' }, { reason: 'not now' }]);
+
+        // From a server removed from Nearhost while it waited: it says so, Decline only.
+        await page.goto('/approve/a4');
+        await expect(main).toContainText('mini, which is no longer in Nearhost');
+        await expect(main).toContainText(
+          'mini is no longer in Nearhost, so this project can’t be added.',
+        );
+        await expect(main.locator('[data-answers] button')).toHaveText(['Decline']);
+
+        const posts = api.requests.filter((r) => r.method === 'POST');
+        expect(posts.map((r) => [r.path, r.body])).toEqual([
+          ['/api/v1/proposals/a1/decline', { reason: 'not now' }],
+        ]);
       });
 
       test('a link to a request that is gone says it is no longer waiting', async ({ page }) => {
@@ -214,12 +229,13 @@ for (const size of sizes) {
         const api = await fakeApi(page, { state: { ...canvas, approvals: [requests.pass('a2')] } });
         api.on('POST /api/v1/passthroughs/requests/a2/answer', () => ({
           status: 500,
-          body: { error: 'x', title: 'build-box isn’t connected', status: 500 },
+          body: { error: 'x', title: 'the grant store is locked', status: 500 },
         }));
         await page.goto('/approve/a2');
         const main = page.locator('main');
         await main.getByRole('button', { name: 'Open port 5173' }).click();
-        await expect(main.getByRole('alert')).toHaveText('build-box isn’t connected');
+        await expect(main.getByRole('alert')).toHaveText('the grant store is locked');
+        await expect(main.getByRole('alert')).toBeFocused();
         await expect(main.getByRole('button', { name: 'Open port 5173' })).toBeEnabled();
       });
 
@@ -228,8 +244,8 @@ for (const size of sizes) {
         api.on('POST /api/v1/documents/requests/a3/answer', () => ({
           status: 409,
           body: {
-            error: 'the request has ended',
-            title: 'the request has ended',
+            error: 'the request for plans/checkout.md has ended: declined',
+            title: 'the request for plans/checkout.md has ended: declined',
             status: 409,
             code: 'control.request-ended',
             ended: true,
@@ -243,6 +259,30 @@ for (const size of sizes) {
         );
         await expect(main).toContainText('Already answered');
         await expect(main.locator('[data-answers] button')).toHaveCount(0);
+      });
+
+      test('a Yes the core could not carry out ends the request and says why', async ({ page }) => {
+        // As the core answers when the passthrough won't open: it ends the request, 409 ended.
+        const api = await fakeApi(page, { state: { ...canvas, approvals: [requests.pass('a2')] } });
+        api.on('POST /api/v1/passthroughs/requests/a2/answer', () => ({
+          status: 409,
+          body: {
+            error: 'build-box isn’t connected',
+            title: 'build-box isn’t connected',
+            status: 409,
+            code: 'control.request-ended',
+            ended: true,
+          },
+        }));
+        await page.goto('/approve/a2');
+        const main = page.locator('main');
+        await main.getByRole('button', { name: 'Open port 5173' }).click();
+        await expect(main.getByRole('heading', { level: 1 })).toHaveText(
+          'This request is no longer waiting',
+        );
+        await expect(main).toContainText('This request has ended: build-box isn’t connected');
+        await expect(main).not.toContainText('Already answered');
+        await expect(main.getByText(/This request has ended/)).toBeFocused();
       });
 
       test('while the machine cannot be reached, answers are off and say why', async ({ page }) => {

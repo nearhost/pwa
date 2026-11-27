@@ -7,11 +7,34 @@ const problem = (status: number, extra: object = {}) =>
 
 describe('a failed answer', () => {
   it('to a request that had ended says already answered', () => {
-    expect(
-      failureOf(problem(409, { ended: true, code: 'control.request-ended' }), 'live', 'leto'),
-    ).toEqual({ kind: 'ended', text: alreadyAnswered });
-    expect(failureOf(problem(409), 'live', 'leto').kind).toBe('ended');
-    expect(failureOf(problem(500, { ended: true }), 'live', 'leto').kind).toBe('ended');
+    const ended = (title: string) =>
+      failureOf(
+        problem(409, { ended: true, code: 'control.request-ended', title }),
+        'live',
+        'leto',
+      );
+    expect(ended('the request for port 5173 has ended: declined')).toEqual({
+      kind: 'ended',
+      text: alreadyAnswered,
+    });
+    expect(ended('no passthrough request r1; it may have ended over 10 minutes ago').text).toBe(
+      alreadyAnswered,
+    );
+    expect(failureOf(problem(409, { title: '' }), 'live', 'leto').text).toBe(alreadyAnswered);
+  });
+
+  it('that ended the request itself says why, not already answered', () => {
+    // A Yes whose passthrough would not open: the core ends the request and answers 409 ended.
+    const f = failureOf(
+      problem(409, {
+        ended: true,
+        code: 'control.request-ended',
+        title: 'build-box isn’t connected',
+      }),
+      'live',
+      'leto',
+    );
+    expect(f).toEqual({ kind: 'ended', text: 'This request has ended: build-box isn’t connected' });
   });
 
   it("shows the problem's title otherwise, a 409 of another kind included", () => {
@@ -25,17 +48,24 @@ describe('a failed answer', () => {
     });
   });
 
-  it("says when Always allow wasn't saved, though the answer was taken", () => {
-    const f = failureOf(problem(500, { allowNotSaved: true, title: 'disk full' }), 'live', 'leto');
-    expect(f).toEqual({
-      kind: 'not-saved',
-      text: "Answered, but Always allow wasn't saved: disk full. You'll be asked again next time.",
-    });
+  it("says when Always allow wasn't saved, though the answer was taken, also on an ended one", () => {
+    const text =
+      "Answered, but Always allow wasn't saved: disk full. You'll be asked again next time.";
+    expect(
+      failureOf(problem(500, { allowNotSaved: true, title: 'disk full' }), 'live', 'leto'),
+    ).toEqual({ kind: 'not-saved', text });
+    expect(
+      failureOf(
+        problem(409, { allowNotSaved: true, ended: true, title: 'disk full' }),
+        'live',
+        'leto',
+      ),
+    ).toEqual({ kind: 'not-saved', text });
   });
 
   it('with no answer blames the connection only when it is not live', () => {
     expect(failureOf(new Error('timeout'), 'live', 'leto').text).toBe(
-      "leto hasn't answered yet. Your answer may still count; this page shows it when it does.",
+      "leto hasn't answered yet, so your answer may or may not have been taken. Answering again is safe: if it was taken, this page says so.",
     );
     expect(failureOf(new TypeError('fetch failed'), 'lost', 'leto').text).toBe(
       'No answer from leto. Try again when the connection is back.',

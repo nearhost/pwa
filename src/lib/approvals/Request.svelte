@@ -1,17 +1,16 @@
 <script lang="ts">
-  // One agent's request, by its id: a proposal to add a project or a server, a passthrough or a
-  // document, with its answers. It follows the state: once the request is gone (answered elsewhere,
+  // One agent's request, by its id: a proposal to add a project (which the app can only decline
+  // until it can add projects), a passthrough or a document, with its answers. It follows the state: once the request is gone (answered elsewhere,
   // expired, given up on) it says it is no longer waiting, in place; what the user answered here
   // stays on the page after the core ends the request it took.
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { resolve } from '$app/paths';
   import ConnectionNotice from '#lib/shell/ConnectionNotice.svelte';
   import { apiClient, appState, followEnvelopes } from '#lib/state.svelte.js';
-  import { Answering, alreadyAnswered } from './answer.svelte.js';
+  import { Answering } from './answer.svelte.js';
   import RequestCard from './RequestCard.svelte';
   import Said from './Said.svelte';
   import {
-    baseName,
     contextOf,
     docView,
     originName,
@@ -43,23 +42,17 @@
   const ctx = $derived(contextOf(appState.state, machine, now));
   const current = $derived(appState.state?.approvals?.find((a) => a.id === id));
 
-  // The request as last seen, for what the page says once it is gone; the name a proposal is
-  // accepted as starts as the one it proposes.
+  // The request as last seen, for what the page says once it is gone.
   let kept: Approval | undefined = $state();
-  let name = $state('');
   let reason = $state('');
   $effect.pre(() => {
     const seen = current;
     if (!seen) return;
-    untrack(() => {
-      if (!kept && seen.proposal) name = seen.proposal.Name || baseName(seen.proposal.Path);
-      kept = seen;
-    });
+    untrack(() => (kept = seen));
   });
 
   const answering = new Answering(() => ({ connection: appState.connection, machine }));
-  // The name the proposal was accepted as, for what the page says after.
-  let sentName = $state('');
+  let result: HTMLElement | undefined = $state();
 
   const shown = $derived(current ?? kept);
   const mode = $derived(
@@ -75,7 +68,7 @@
   );
   const goneReason = $derived(
     answering.failure?.kind === 'ended'
-      ? alreadyAnswered
+      ? answering.failure.text
       : kept || endedHere
         ? 'It ended while this page was open: it was answered elsewhere, it expired, or the agent stopped waiting.'
         : 'It was answered, it expired, or the agent stopped waiting before this page opened.',
@@ -84,23 +77,24 @@
   const off = $derived(!live || busy);
   const describedBy = $derived(live ? undefined : 'connection-reason');
 
-  function accept() {
-    const n = name.trim();
-    sentName = n;
-    void answering.send('accept', () =>
-      apiClient().send('POST', '/v1/proposals/{id}/accept', { name: n }, { id }),
-    );
+  // Sends an answer, then takes the focus to what came of it, so it is read out and seen.
+  async function send(a: string, ask: () => Promise<unknown>) {
+    await answering.send(a, ask);
+    await tick();
+    result?.focus();
   }
 
+  // A proposal is only declined here: the core's accept tells the agent the project was saved,
+  // which the app can't do yet.
   function decline() {
     const r = reason.trim();
-    void answering.send('decline', () =>
+    void send('decline', () =>
       apiClient().send('POST', '/v1/proposals/{id}/decline', { reason: r }, { id }),
     );
   }
 
   function answer(kind: 'pass' | 'doc', a: 'yes' | 'no' | 'always') {
-    void answering.send(a, () =>
+    void send(a, () =>
       kind === 'pass'
         ? apiClient().send('POST', '/v1/passthroughs/requests/{id}/answer', { answer: a }, { id })
         : apiClient().send('POST', '/v1/documents/requests/{id}/answer', { answer: a }, { id }),
@@ -111,11 +105,7 @@
 
   /** What came of the answer, in the request's words. */
   function doneText(a: Approval, said: string): Segment[] {
-    if (a.proposal) {
-      return said === 'accept'
-        ? ['Accepted. The agent was told to add it as ', q(sentName), '.']
-        : ['Declined. The agent was told no.'];
-    }
+    if (a.proposal) return ['Declined. The agent was told no.'];
     const r = a.pass ?? a.doc;
     if (!r) return ['Answered.'];
     const who = q(requesterName(r.Requester));
@@ -137,12 +127,24 @@
 
 {#snippet problem()}
   {#if answering.failure && answering.failure.kind !== 'ended'}
-    <p class="problem" role="alert">{answering.failure.text}</p>
+    {#if answering.done}
+      <p class="problem" role="alert">{answering.failure.text}</p>
+    {:else}
+      <p class="problem" role="alert" tabindex="-1" bind:this={result}>
+        {answering.failure.text}
+      </p>
+    {/if}
   {/if}
 {/snippet}
 
+{#snippet sending()}
+  {#if answering.busy}<p class="sending">Sending…</p>{/if}
+{/snippet}
+
 {#snippet finished(a: Approval)}
-  <p class="done" role="status"><Said segments={doneText(a, answering.done ?? '')} /></p>
+  <p class="done" role="status" tabindex="-1" bind:this={result}>
+    <Said segments={doneText(a, answering.done ?? '')} />
+  </p>
   {@render problem()}
   <a class="back" href={resolve('/')}>Back to the overview</a>
 {/snippet}
@@ -154,13 +156,13 @@
     <p class="quiet">{appState.connection === 'signed-out' ? '' : `Connecting to ${machine}…`}</p>
   {:else if mode === 'gone' || !shown}
     <RequestCard icon="check" tone="quiet" title={['This request is no longer waiting']}>
-      <p class="note">{goneReason}</p>
+      <p class="note" tabindex="-1" bind:this={result}>{goneReason}</p>
       <a class="back" href={resolve('/')}>Back to the overview</a>
     </RequestCard>
   {:else if shown.proposal}
     {@const v = proposalView(shown.proposal, ctx)}
     <RequestCard
-      icon={v.kind === 'server' ? 'server' : 'code'}
+      icon="code"
       title={v.title}
       intro={v.intro}
       waits={mode === 'open' ? v.waits : undefined}
@@ -170,19 +172,14 @@
       {:else}
         <ConnectionNotice waits="answering" />
         <dl class="fields">
-          <dt>Name</dt>
-          <dd class="input">
-            <label>
-              <span class="visually-hidden">Project name</span>
-              <input type="text" bind:value={name} autocomplete="off" spellcheck="false" />
-            </label>
-          </dd>
           {#each v.fields as field (field.label)}
             <dt>{field.label}</dt>
             <dd dir="auto"><Said segments={field.value} /></dd>
           {/each}
         </dl>
-        <p class="note">{v.note}</p>
+        {#each v.notes as note, i (i)}
+          <p class="note" data-proposal-note><Said segments={note} /></p>
+        {/each}
         <label class="reason">
           Reason to tell the agent, if you decline
           <input type="text" bind:value={reason} placeholder="Optional" autocomplete="off" />
@@ -190,16 +187,6 @@
         {@render problem()}
         <div class="answers" data-answers>
           <div class="row">
-            <button
-              type="button"
-              class="primary"
-              disabled={off || !name.trim()}
-              aria-busy={answering.busy === 'accept'}
-              aria-describedby={describedBy}
-              onclick={accept}
-            >
-              Add {name.trim() || (v.kind === 'server' ? 'the server' : 'the project')}
-            </button>
             <button
               type="button"
               disabled={off}
@@ -210,6 +197,7 @@
               Decline
             </button>
           </div>
+          {@render sending()}
         </div>
       {/if}
     </RequestCard>
@@ -273,6 +261,7 @@
                 : 'show documents'} on <bdi>{originName(r.Origin, ctx)}</bdi>
             </button>
           {/if}
+          {@render sending()}
         </div>
       {/if}
     </RequestCard>
@@ -295,5 +284,9 @@
   .quiet {
     margin: 0;
     color: var(--nh-muted);
+  }
+
+  .request :global([tabindex='-1']:focus) {
+    outline: none;
   }
 </style>
