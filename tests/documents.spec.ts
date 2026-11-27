@@ -56,7 +56,7 @@ for (const size of sizes) {
         await expect(inFrame(page).locator('html')).toHaveAttribute('data-nh-theme', 'paper');
         await expect(inFrame(page).locator('body')).toHaveCSS(
           'background-color',
-          'rgb(244, 245, 241)',
+          'rgb(246, 244, 246)',
         );
         expect(api.documentRequests).toContain('/d/T1/docs/plans/checkout.md?theme=paper');
 

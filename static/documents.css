@@ -18,12 +18,12 @@
 /* Paper. */
 :where(:root[data-nh-theme='paper']) {
   color-scheme: light;
-  --nh-doc-ground: #f4f5f1;
-  --nh-doc-text: #1b1f1c;
-  --nh-doc-muted: #5a615b;
-  --nh-doc-code-bg: #e6e8e1;
-  --nh-doc-rule: #b9bfb5;
-  --nh-doc-line: #dcdfd7;
+  --nh-doc-ground: #f6f4f6;
+  --nh-doc-text: #1e1820;
+  --nh-doc-muted: #5b4f5a;
+  --nh-doc-code-bg: #ebe7eb;
+  --nh-doc-rule: #bfb6bd;
+  --nh-doc-line: #ddd7dc;
   --nh-doc-link: #b0156c;
   --nh-doc-accent: #b0156c;
   --nh-doc-image-outline: oklch(0 0 0 / 0.1);
@@ -47,8 +47,8 @@
   --nh-doc-hl-error: #82071e;
   --nh-doc-hl-error-text: #f6f8fa;
   --nh-doc-hl-error-bg: #82071e;
-  --nh-doc-hl-line: #dcdfd7;
-  --nh-doc-hl-number-line: #6e756f;
+  --nh-doc-hl-line: #ddd7dc;
+  --nh-doc-hl-number-line: #675b66;
 }
 
 /* Match app, dark: the default, and the scheme data-nh-scheme="dark" names. */
