@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  # Format, lint, type check, unit tests, end-to-end tests in Chromium and WebKit, then the build.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run verify
+      # The build must leave the tree as committed: dist/ ignored except dist/.gitkeep.
+      - run: test -f dist/index.html && git diff --exit-code && test -z "$(git status --porcelain)"
