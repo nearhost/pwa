@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyStoredAppearance, getAppearance, setAppearance, storageKey } from '#lib/theme.js';
+import {
+  applyStoredAppearance,
+  getAppearance,
+  setAppearance,
+  storageKey,
+  themeColors,
+} from '#lib/theme.js';
 
 const root = () => document.documentElement;
 
@@ -76,5 +82,66 @@ describe('appearance', () => {
     setAppearance('dark');
     expect(root().getAttribute('data-theme')).toBe('dark');
     vi.restoreAllMocks();
+  });
+});
+
+describe('theme-color', () => {
+  const metas = () =>
+    Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')).map((m) => [
+      m.getAttribute('media'),
+      m.getAttribute('content'),
+    ]);
+
+  beforeEach(() => {
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    localStorage.clear();
+    // As app.html has them: one for each scheme.
+    document.head.innerHTML =
+      '<meta name="theme-color" content="#0f1210" media="(prefers-color-scheme: dark)">' +
+      '<meta name="theme-color" content="#f4f5f1" media="(prefers-color-scheme: light)">';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('is the ground of each scheme', () => {
+    expect(themeColors).toEqual({ dark: '#0f1210', light: '#f4f5f1' });
+  });
+
+  it('follows a light or dark override in both schemes, and each its own under system', () => {
+    setAppearance('light');
+    expect(metas()).toEqual([
+      ['(prefers-color-scheme: dark)', '#f4f5f1'],
+      ['(prefers-color-scheme: light)', '#f4f5f1'],
+    ]);
+    setAppearance('dark');
+    expect(metas()).toEqual([
+      ['(prefers-color-scheme: dark)', '#0f1210'],
+      ['(prefers-color-scheme: light)', '#0f1210'],
+    ]);
+    setAppearance('system');
+    expect(metas()).toEqual([
+      ['(prefers-color-scheme: dark)', '#0f1210'],
+      ['(prefers-color-scheme: light)', '#f4f5f1'],
+    ]);
+  });
+
+  it('follows the stored appearance on start', () => {
+    localStorage.setItem(storageKey, 'light');
+    applyStoredAppearance();
+    expect(metas().map(([, content]) => content)).toEqual(['#f4f5f1', '#f4f5f1']);
+  });
+
+  it('keeps an appearance for the session when storage throws', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    setAppearance('dark');
+    expect(getAppearance()).toBe('dark');
   });
 });
