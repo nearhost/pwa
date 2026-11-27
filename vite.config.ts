@@ -38,6 +38,10 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Fonts are always files: the CSP's font-src is 'self' only, so a data: URI would be refused.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
+  },
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
