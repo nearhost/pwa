@@ -1,0 +1,62 @@
+/* The web app's global styles: fonts, tokens, the page ground and the shell's insets. */
+
+@import '@fontsource-variable/space-grotesk/index.css';
+@import '@fontsource-variable/dm-sans/index.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+@import './tokens.css';
+
+/*
+ * The keep-clear top band and the bottom inset (the canvas's shell rules).
+ * In a browser tab the band is just the safe-area inset and there is no bottom inset. Installed
+ * (display-mode: standalone), the band never drops below a floor, so nothing sits under the
+ * status bar even when iPadOS reports its inset as 0: 56px when the viewport's shorter side is at
+ * least 600px (iPad), 92px otherwise (phone). The shell reads display-mode through matchMedia and
+ * marks <html> with data-display-mode="standalone"; see #lib/shell/display-mode.
+ */
+:root {
+  --pwa-band: env(safe-area-inset-top, 0px);
+  --pwa-inset-bottom: 0px;
+}
+
+:root[data-display-mode='standalone'] {
+  --pwa-band: max(env(safe-area-inset-top, 0px), 92px);
+  --pwa-inset-bottom: max(env(safe-area-inset-bottom, 0px), 34px);
+}
+
+@media (min-width: 600px) and (min-height: 600px) {
+  :root[data-display-mode='standalone'] {
+    --pwa-band: max(env(safe-area-inset-top, 0px), 56px);
+    --pwa-inset-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  }
+}
+
+/* A theme switch changes every colour at once; nothing animates through it (#lib/theme). */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--nh-ground);
+}
+
+body {
+  min-height: 100dvh;
+  color: var(--nh-body);
+  font-family: var(--nh-font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
