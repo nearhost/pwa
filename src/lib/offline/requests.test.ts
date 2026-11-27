@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handling, shellPath } from './requests.js';
+import { handling, shellPath, staleCache } from './requests.js';
 
 const origin = 'https://nearhost.lab.example.dev';
 const precached = new Set([
@@ -109,5 +109,27 @@ describe('handling', () => {
     // %2F is not a slash: /api%2Fv1 is still not the app's, and an escaped /api is not a way round.
     expect(handling(get('/%61pi/v1/state'), origin, precached)).toBe('pass');
     expect(handling(get('/%61pi/v1/state', 'navigate'), origin, precached)).toBe('pass');
+  });
+});
+
+describe('staleCache', () => {
+  const current = 'nearhost-app-1795801949333';
+
+  it('keeps the current cache', () => {
+    expect(staleCache(current, current)).toBe(false);
+  });
+
+  it('drops an older build’s cache', () => {
+    expect(staleCache('nearhost-app-1795800000000', current)).toBe(true);
+  });
+
+  it('drops the old page’s shell caches, whatever their version', () => {
+    expect(staleCache('nearhost-shell-0.16.0', current)).toBe(true);
+    expect(staleCache('nearhost-shell-dev', current)).toBe(true);
+  });
+
+  it('leaves caches that are not the app’s alone', () => {
+    expect(staleCache('something-else', current)).toBe(false);
+    expect(staleCache('nearhost-other', current)).toBe(false);
   });
 });

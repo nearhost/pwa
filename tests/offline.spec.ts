@@ -89,6 +89,30 @@ test.describe('the service worker', () => {
     await expect(offlineView(page)).toBeVisible();
   });
 
+  test('clears the old page’s shell cache and older builds’ caches once it activates', async ({
+    page,
+  }) => {
+    // What a device that had the old page (its /sw.js) or an older build keeps, made before the
+    // worker installs: installing fetches the whole build, so these are there first.
+    await page.addInitScript(() => {
+      void caches
+        .open('nearhost-shell-0.16.0')
+        .then((c) => c.put('/offline.html', new Response('old')));
+      void caches.open('nearhost-app-1').then((c) => c.put('/index.html', new Response('old')));
+      void caches.open('not-ours').then((c) => c.put('/x', new Response('x')));
+    });
+    await fakeApi(page, { state: canvas });
+    await page.goto('/');
+    await workerReady(page);
+    await expect
+      .poll(() => page.evaluate(() => caches.keys()))
+      .toEqual(expect.arrayContaining(['not-ours']));
+    const names = await page.evaluate(() => caches.keys());
+    expect(names.filter((n) => n.startsWith('nearhost-'))).toHaveLength(1);
+    expect(names.find((n) => n.startsWith('nearhost-'))).toMatch(/^nearhost-app-\d+$/);
+    expect(names).not.toContain('nearhost-app-1');
+  });
+
   test('keeps the shell and the build’s files, nothing of the core’s', async ({ page }) => {
     await fakeApi(page, { state: canvas });
     await page.goto('/');

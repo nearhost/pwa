@@ -53,3 +53,14 @@ export function handling(request: RequestLike, origin: string, precached: Set<st
   if (request.mode === 'navigate') return 'shell';
   return precached.has(url.pathname) ? 'precached' : 'pass';
 }
+
+/** The app's caches: one per build, named for its version. */
+export const cachePrefix = 'nearhost-app-';
+// The old page's worker (the core's /sw.js) kept its shell in nearhost-shell-<version>.
+const oldPagePrefix = 'nearhost-shell-';
+
+/** Whether the cache name is one to delete once the worker with current is active. */
+export function staleCache(name: string, current: string): boolean {
+  if (name === current) return false;
+  return name.startsWith(cachePrefix) || name.startsWith(oldPagePrefix);
+}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test.js';
 import { envelope, fakeApi, type FakeApi } from './fake-api.js';
 import { canvas, project, requests } from './fixtures.js';
 import { schemes, sizes } from './sizes.js';

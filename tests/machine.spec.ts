@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, outsideTheApp, test, type Page } from './test.js';
 import { fakeApi } from './fake-api.js';
 import { canvas } from './fixtures.js';
 import { schemes, sizes } from './sizes.js';
@@ -329,6 +329,7 @@ test('signed out at nearhost.localhost, it points at the page address', async ({
   baseURL,
 }) => {
   test.skip(browserName !== 'chromium', 'only Chromium resolves *.localhost by itself');
+  outsideTheApp('another origin, where the worker installed for the test is not');
   await fakeApi(page, { signedOut: true });
   const port = new URL(baseURL!).port;
   await page.goto(`http://nearhost.localhost:${port}/machine`);

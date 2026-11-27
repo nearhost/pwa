@@ -60,7 +60,7 @@
           if (!trying) retry();
         }}
         aria-disabled={trying}
-        aria-describedby="last-answered"
+        aria-describedby={at ? 'last-answered' : undefined}
       >
         {trying ? 'Trying…' : 'Try again'}
       </button>

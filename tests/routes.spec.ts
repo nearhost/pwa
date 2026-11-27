@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test.js';
 import { envelope, fakeApi } from './fake-api.js';
 import { schemes, sizes } from './sizes.js';
 

@@ -12,15 +12,15 @@
 // nearhost-app-<version>. It does not skip waiting: a page that is open keeps the worker, and the
 // cache, it loaded with, so its own route chunks still load from that cache offline after the core
 // was updated. The new worker takes over once no page uses the old one (the app closed and opened
-// again), and only then deletes the old caches. Its first install claims the open page, which no
-// worker controlled, so that page's chunks are served offline too.
+// again), and only then deletes the old caches, the old page's nearhost-shell-* among them. Its
+// first install claims the open page, which no worker controlled, so that page's chunks are served
+// offline too.
 import { self } from '$app/service-worker';
 import { assets, immutable } from '$app/manifest';
 import { version } from '$app/env';
-import { handling, shellPath } from '#lib/offline/requests.js';
+import { cachePrefix, handling, shellPath, staleCache } from '#lib/offline/requests.js';
 
-const prefix = 'nearhost-app-';
-const cacheName = prefix + version;
+const cacheName = cachePrefix + version;
 const navigationTimeout = 4000;
 
 // The manifest's paths are relative to the app's base, where this worker is.
@@ -44,7 +44,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       for (const name of await caches.keys()) {
-        if (name.startsWith(prefix) && name !== cacheName) await caches.delete(name);
+        if (staleCache(name, cacheName)) await caches.delete(name);
       }
       await self.clients.claim();
     })(),
@@ -66,12 +66,14 @@ self.addEventListener('fetch', (event) => {
 });
 
 async function navigate(request: Request): Promise<Response> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('no answer in time')), navigationTimeout);
-  });
+  // A navigation the network hasn't answered in time is given up, not left to run on.
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('No answer in time', 'TimeoutError')),
+    navigationTimeout,
+  );
   try {
-    return await Promise.race([fetch(request), timeout]);
+    return await fetch(request, { signal: controller.signal });
   } catch {
     const shell = await caches.match(shellPath, { cacheName });
     return (
