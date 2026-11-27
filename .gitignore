@@ -1,0 +1,26 @@
+# build output: only the release commits carry dist/
+dist/*
+!dist/.gitkeep
+.svelte-kit/
+
+# dependencies
+node_modules/
+
+# test output
+test-results/
+playwright-report/
+
+# logs
+npm-debug.log*
+
+# environment variables
+.env*
+
+# macOS-specific files
+.DS_Store
+
+# Some global gitignores exclude "docs"; keep them tracked here.
+!**/docs/
+
+# local scratch
+.superpowers/
