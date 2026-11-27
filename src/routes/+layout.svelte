@@ -7,6 +7,10 @@
   import Shell from '#lib/shell/Shell.svelte';
   import { createClient } from '#lib/api/client.js';
   import { appState, startState } from '#lib/state.svelte.js';
+  import { startLogs } from '#lib/preview/logs.svelte.js';
+  import { page } from '$app/state';
+  import Sidebar from '#lib/overview/Sidebar.svelte';
+  import SectionTabs from '#lib/overview/SectionTabs.svelte';
 
   let { children }: { children: Snippet } = $props();
 
@@ -14,13 +18,16 @@
   applyStoredAppearance();
   const stopWatching = watchDisplayMode();
   onMount(() => {
+    const stopLogs = startLogs();
     const stopState = startState(createClient());
     return () => {
       stopState();
+      stopLogs();
       stopWatching();
     };
   });
 
+  const preview = $derived(page.route.id === '/projects/[name]');
   const machine = $derived(appState.session?.machine || 'this machine');
   const line = $derived(
     {
@@ -32,7 +39,10 @@
   );
 </script>
 
-<Shell>
+<!-- A preview fills the space below the header with its frame; every other page has the sections. -->
+{#snippet sidebar()}<Sidebar />{/snippet}
+{#snippet tabs()}<SectionTabs />{/snippet}
+<Shell fill={preview} sidebar={preview ? undefined : sidebar} tabs={preview ? undefined : tabs}>
   {#snippet header()}
     <span class="machine-name" data-machine>{machine}</span>
     <span class="connection" data-connection={appState.connection} role="status">{line}</span>

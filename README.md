@@ -43,7 +43,7 @@ test('a project starts', async ({ page }) => {
 });
 ```
 
-The states and sessions come from the same builders as the unit tests' (`src/lib/api/testing.ts`). Journeys run at the canvas's three sizes (`tests/sizes.ts`) in both colour schemes. Locally, run Chromium with `npx playwright test --project=chromium --workers=2`; WebKit runs on a Mac.
+The states and sessions come from the same builders as the unit tests' (`src/lib/api/testing.ts`); `fakeApi` copies the state it is given, so a test that changes `api.state` never changes a shared fixture. `tests/fixtures.ts` has the canvas's projects (`canvas`: storefront with three routes, docs-site and a stopped admin on leto; api and a starting worker on the server build-box), and `serveSites(page, { hang })` answers the projects' own addresses (`https://*.lab.example.dev`) in the preview's frame with a small page, except the hosts in `hang`, which never answer. The preview's 8 s load timeout is driven with Playwright's clock (`page.clock.install()`, then `page.clock.fastForward(8_000)` once the frame is there). Journeys run at the canvas's three sizes (`tests/sizes.ts`) in both colour schemes. Locally, run Chromium with `npx playwright test --project=chromium --workers=2`; WebKit runs on a Mac.
 
 ### Developing against a running core
 

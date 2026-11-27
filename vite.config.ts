@@ -67,6 +67,9 @@ export default defineConfig({
           'img-src': ['self', 'data:'],
           'font-src': ['self'],
           'connect-src': ['self'],
+          // The preview's frame shows the projects' own sites, which are only ever https. The core's
+          // header names the projects' hosts; the build can't know them.
+          'frame-src': ['https:'],
           'manifest-src': ['self'],
           'worker-src': ['self'],
           'base-uri': ['none'],
