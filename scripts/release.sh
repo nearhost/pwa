@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Build the app and commit it as a Go module release: scripts/release.sh X.Y.Z [--dry-run]
-# Run from a checkout of the build/vX.Y.Z tag. Makes a "release vX.Y.Z" commit on a detached HEAD that
-# carries dist/ and version.go (on no branch), tags it vX.Y.Z and pushes only that tag (not with --dry-run).
+# Build the app and commit it as a Go module release: scripts/release.sh VERSION [--dry-run]
+# VERSION is X.Y.Z for a release or X.Y.Z-beta.N for a beta (a Go prerelease version, which
+# `go get @latest` passes over). Run from a checkout of the build/vVERSION tag. Makes a
+# "release vVERSION" commit on a detached HEAD that carries dist/ and version.go (on no branch),
+# tags it vVERSION and pushes only that tag (not with --dry-run).
 set -euo pipefail
 
-usage="usage: scripts/release.sh X.Y.Z [--dry-run]"
+usage="usage: scripts/release.sh X.Y.Z[-beta.N] [--dry-run]"
 version="${1:-}"
 dry_run=false
 if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != "--dry-run" ]; }; then
@@ -12,7 +14,7 @@ if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != "--dry-run" ]; }; then
   exit 2
 fi
 [ "${2:-}" = "--dry-run" ] && dry_run=true
-if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
   echo "$usage" >&2
   exit 2
 fi

@@ -1,38 +1,67 @@
 name: release
-# Push a build/vX.Y.Z tag to release X.Y.Z: the workflow builds the app, commits dist/ and
-# version.go in a release commit (not on main), tags it vX.Y.Z (the Go module version) and
-# creates a GitHub release. workflow_dispatch with dry_run (the default) builds and tests
-# without pushing the tag or creating a release.
+# Builds the Go module release of a GitHub release tagged build/vVERSION. No one pushes tags by
+# hand: release-please publishes build/vX.Y.Z when its release PR is merged
+# (release-please.yml), and beta.yml publishes the prerelease build/vX.Y.Z-beta.N from every
+# push to that PR. Both publish with the CI app's token, which, unlike GITHUB_TOKEN, starts
+# this workflow.
+#
+# It checks out the tag, builds the app, commits dist/ and version.go in a release commit (not
+# on main), pushes that commit's tag vVERSION (the Go module version: a beta is a Go
+# prerelease, which `go get @latest` passes over) and adds the go get line to the release's
+# notes. A prerelease stays a prerelease.
+#
+# workflow_dispatch with dry_run (the default) builds and tests a tag without pushing the
+# module tag or touching the release. Without dry_run it releases a tag whose GitHub release
+# exists, for when the run from the release failed.
 on:
-  push:
-    tags: ['build/v*']
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Source tag to release from, e.g. build/v0.1.0
+        description: Release tag to build, e.g. build/v0.1.0 or build/v0.2.0-beta.1
         required: true
       dry_run:
-        description: Build and test only; push no tag and create no release
+        description: Build and test only; push no tag and leave the release as it is
         type: boolean
         default: true
-permissions:
-  contents: write
+permissions: {}
 concurrency:
   group: release
   cancel-in-progress: false
 jobs:
   release:
+    # Only releases of build tags: the module's own vX.Y.Z tags have no GitHub releases, and
+    # any other release is not this workflow's.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'build/v')
     runs-on: ubuntu-latest
+    permissions:
+      # Push the module tag and edit the release's notes.
+      contents: write
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
     steps:
       - name: Check the tag
         run: |
-          [[ "$TAG" =~ ^build/v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad tag: $TAG" >&2; exit 1; }
+          [[ "$TAG" =~ ^build/v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]] || { echo "::error::bad tag: $TAG" >&2; exit 1; }
+      # A beta must stay off "latest" and a release must not hide as a prerelease, so the
+      # release's kind must match its version. A dry run needs no release at all.
+      - name: Check the release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease -q .isPrerelease)
+          beta=false
+          [[ "$TAG" == *-beta.* ]] && beta=true
+          if [ "$prerelease" != "$beta" ]; then
+            echo "::error::$TAG is a beta: $beta, but its release is a prerelease: $prerelease" >&2
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -46,11 +75,15 @@ jobs:
           flag=""
           [ "$DRY_RUN" = "true" ] && flag="--dry-run"
           scripts/release.sh "${TAG#build/v}" $flag
-      - name: Create the GitHub release
+      # The release keeps release-please's (or beta.yml's) notes and title; this adds the
+      # module version to fetch. Through a file, so the notes' quotes and backticks reach gh as
+      # they are. gh release edit leaves the prerelease flag alone.
+      - name: Add the Go module to the release notes
         if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${TAG#build/v}"
-          gh release create "v$version" --verify-tag --title "v$version" \
-            --notes "The Nearhost web app $version as a Go module: \`go get github.com/nearhost/pwa@v$version\`."
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > "$RUNNER_TEMP/notes.md"
+          printf '\nGo module: %sgo get github.com/nearhost/pwa@v%s%s\n' '`' "$version" '`' >> "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"

@@ -59,14 +59,28 @@ The proxy signs in anyone who can reach the dev server, so keep it on `localhost
 
 This repository is also the Go module `github.com/nearhost/pwa`. `package pwa` has `FS() fs.FS` (the built app), `Built() bool` (true when `dist/index.html` is present) and `const Version`. On `main` `dist/` holds only `.gitkeep`, so `Built()` is false and `Version` is `"dev"`.
 
-To release version X.Y.Z, push the tag `build/vX.Y.Z` on the commit to build (a person or Claude). The `release` workflow then:
+Releases and betas need no tags pushed by hand; [release-please](https://github.com/googleapis/release-please) makes them from the conventional commits on `main`:
 
-1. checks that commit out, runs `npm ci && npm run build`, writes `version.go` and runs `go test -tags release`,
-2. commits `dist/` and `version.go` as "release vX.Y.Z" on a detached HEAD (it is not on `main`),
-3. pushes only the tag `vX.Y.Z`, which is the Go module version, and
-4. creates the GitHub release `vX.Y.Z`.
+- **A release.** release-please keeps a release PR open on `main` that bumps `package.json` and `.release-please-manifest.json` and writes `CHANGELOG.md`. Merge it to release that version, X.Y.Z: release-please tags the merge commit `build/vX.Y.Z` and publishes its GitHub release.
+- **A beta.** Every push to the release PR's branch (`release-please--branches--main--components--build`) publishes the next beta of its version, X.Y.Z-beta.N, as the GitHub prerelease `build/vX.Y.Z-beta.N` (the `beta` workflow). Running `beta` by hand on that branch publishes another.
 
-Run the workflow by hand (Actions, release) with `dry_run` on to build and test without pushing a tag. Locally, `scripts/release.sh X.Y.Z --dry-run` in a clean clone does the same, prints the commit and tag it would push, then deletes the tag and returns to where it started. Without `--dry-run` the script refuses unless `build/vX.Y.Z` exists and HEAD is that tag's commit. `scripts/release_test.sh` checks these guards.
+Each published release of a `build/v` tag starts the `release` workflow, which:
+
+1. checks the tag out, runs `npm ci && npm run build`, writes `version.go` and runs `go test -tags release`,
+2. commits `dist/` and `version.go` as "release vVERSION" on a detached HEAD (it is not on `main`),
+3. pushes only the tag `vVERSION`, which is the Go module version, and
+4. adds `go get github.com/nearhost/pwa@vVERSION` to the release's notes.
+
+A beta's module version, `vX.Y.Z-beta.N`, is a Go prerelease: `go get github.com/nearhost/pwa@latest` passes over it, so the core takes a beta only by naming it. The beta's GitHub release stays a prerelease.
+
+Run the `release` workflow by hand (Actions, release) with a `build/v` tag and `dry_run` on to build and test without pushing a tag; with `dry_run` off it releases a tag whose GitHub release exists, when the run the release started failed. Locally, `scripts/release.sh VERSION --dry-run` (X.Y.Z or X.Y.Z-beta.N) in a clean clone does the same, prints the commit and tag it would push, then deletes the tag and returns to where it started. Without `--dry-run` the script refuses unless `build/vVERSION` exists and HEAD is that tag's commit. `scripts/release_test.sh` checks these guards, and `.github/scripts/beta-version_test.sh` the beta numbering; CI runs both.
+
+### One-time setup
+
+release-please and `beta` act with the token of the CI GitHub App the core repository uses (nearhost-ci), because a release or PR made with the workflows' own `GITHUB_TOKEN` starts no other workflow. The app must be installed on this repository with read and write access to contents and pull requests, and the repository (or the organisation) needs:
+
+- the variable `NH_APP_CLIENT_ID`, the app's client ID, and
+- the secret `NH_APP_PRIVATE_KEY`, a private key of the app.
 
 The core picks a release up with `go get github.com/nearhost/pwa@vX.Y.Z` and serves `pwa.FS()` when `pwa.Built()` is true.
 

@@ -34,16 +34,26 @@ expect_refused() {
   git reset -q --hard
   git clean -qfd -e node_modules
   git checkout -q --detach "$(git -C "$src" rev-parse HEAD)"
-  git tag -d "v9.9.9" >/dev/null 2>&1
+  git tag -d "v9.9.9" "v9.9.9-beta.1" >/dev/null 2>&1
 }
 
 expect_refused "no build tag, no --dry-run" "requires the tag build/v9.9.9" 9.9.9
 expect_refused "misspelt flag --dryrun" "usage" 9.9.9 --dryrun
 expect_refused "misspelt flag --dry_run" "usage" 9.9.9 --dry_run
 expect_refused "extra argument after --dry-run" "usage" 9.9.9 --dry-run extra
+expect_refused "beta, no build tag, no --dry-run" "requires the tag build/v9.9.9-beta.1" 9.9.9-beta.1
+expect_refused "no version" "usage"
+expect_refused "two-part version" "usage" 9.9 --dry-run
+expect_refused "version with v" "usage" v9.9.9 --dry-run
+expect_refused "rc, not beta" "usage" 9.9.9-rc.1 --dry-run
+expect_refused "beta without a number" "usage" 9.9.9-beta --dry-run
+expect_refused "beta number with a suffix" "usage" 9.9.9-beta.1x --dry-run
 
 git -c tag.gpgSign=false tag build/v9.9.9 HEAD~1
 expect_refused "HEAD not at build tag" "HEAD is not the commit of build/v9.9.9" 9.9.9
 expect_refused "HEAD not at build tag, even with --dry-run" "HEAD is not the commit of build/v9.9.9" 9.9.9 --dry-run
+
+git -c tag.gpgSign=false tag build/v9.9.9-beta.1 HEAD~1
+expect_refused "beta, HEAD not at build tag" "HEAD is not the commit of build/v9.9.9-beta.1" 9.9.9-beta.1
 
 exit $fail

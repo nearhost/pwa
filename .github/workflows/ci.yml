@@ -30,3 +30,38 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./...
       - run: go test -p 4 ./...
+      # The release-only version check's pattern; the rest of the release tests need a build.
+      - run: go test -p 4 -tags release -run TestReleaseVersionPattern ./...
+  # The release machinery that only runs on main, the release PR or a release, checked here
+  # first: beta.yml's numbering, release-please's config and release.sh's guards.
+  release-config:
+    runs-on: ubuntu-latest
+    steps:
+      # Every commit, so release_test.sh can tag HEAD~1.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # The script beta.yml numbers each beta with.
+      - name: Check the beta numbering
+        run: sh .github/scripts/beta-version_test.sh
+      # release.yml, beta.yml and the Go module rely on these: a release tagged build/vX.Y.Z,
+      # a manifest holding the one package ".", and beta.yml on release-please's branch for the
+      # component "build".
+      - name: Check the release-please config
+        run: |
+          set -eu
+          jq -e '.packages | keys == ["."]' release-please-config.json
+          jq -e '.packages["."] | .["release-type"] == "node" and .component == "build"
+            and .["include-component-in-tag"] == true and .["tag-separator"] == "/"' release-please-config.json
+          jq -e 'keys == ["."] and (.["."] | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' .release-please-manifest.json
+          branch="release-please--branches--main--components--$(jq -r '.packages["."].component' release-please-config.json)"
+          if ! grep -qxF "    branches: [$branch]" .github/workflows/beta.yml \
+            || ! grep -qxF "      BRANCH: $branch" .github/workflows/beta.yml; then
+            echo "::error::beta.yml must run on $branch (on.push.branches and env.BRANCH)"
+            exit 1
+          fi
+      # release.sh's guards, in a throwaway clone; every case is refused before a build.
+      - name: Check release.sh's guards
+        env:
+          RELEASE_TEST_DIR: ${{ runner.temp }}
+        run: scripts/release_test.sh
