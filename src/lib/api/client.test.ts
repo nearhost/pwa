@@ -208,6 +208,16 @@ describe('createClient', () => {
     // @ts-expect-error ... every one of them
     await refused(() => client.send('POST', '/v1/projects/{name}/recheck', undefined, {}));
 
+    // A write to a path without parameters takes no body when it has none, and no parameters.
+    fake.on('POST /api/v1/stop', () => new Response(null, { status: 204 }));
+    await client.send('POST', '/v1/stop');
+    await client.send('POST', '/v1/stop', undefined);
+    // @ts-expect-error an untemplated write takes no parameters
+    await client.send('POST', '/v1/stop', undefined, {}).catch(() => {});
+    // @ts-expect-error ... nor named ones
+    await client.send('POST', '/v1/stop', undefined, { name: 'shop' }).catch(() => {});
+    expect(fake.count('POST /api/v1/stop')).toBe(4);
+
     // A path without parameters takes none.
     await client.get('/v1/state');
     await client.get('/v1/state', { signal: new AbortController().signal });

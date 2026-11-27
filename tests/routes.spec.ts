@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { fakeApi } from './fake-api.js';
+import { envelope, fakeApi } from './fake-api.js';
 import { schemes, sizes } from './sizes.js';
 
 // Every route of the app, including the links the core, the skill and the agents hand out, renders
@@ -41,10 +41,12 @@ for (const size of sizes) {
 test.describe('links from outside the app', () => {
   test.use({ viewport: sizes[0].viewport });
 
-  test('a project name with spaces and slashes is the heading, decoded', async ({ page }) => {
+  test('a project name with a space or a slash is the heading, decoded', async ({ page }) => {
     await fakeApi(page);
     await page.goto('/change/my%20shop');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Change to my shop');
+    await page.goto('/change/a%2Fb');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Change to a/b');
   });
 
   test('the not-found view links back to the overview', async ({ page }) => {
@@ -79,6 +81,43 @@ test.describe('the fake API', () => {
     }));
     await api.drop();
     await expect(page.locator('[data-connection]')).toHaveText("Can't reach leto");
+  });
+
+  test('a config envelope reads the state once more, and the app stays live', async ({ page }) => {
+    const api = await fakeApi(page);
+    await page.goto('/');
+    await expect(page.locator('[data-connection]')).toHaveText('Live');
+    const reads = () => api.requests.filter((r) => r.path === '/api/v1/state').length;
+    expect(reads()).toBe(1);
+    await api.send(envelope(6, { kind: 'config' }), envelope(7, { kind: 'shown' }));
+    await expect.poll(reads).toBe(2);
+    // Settled: no further reads, as there would be if the fake's seq stood still.
+    await page.waitForTimeout(300);
+    expect(reads()).toBe(2);
+    await expect(page.locator('[data-connection]')).toHaveText('Live');
+  });
+
+  test('a write without the token or the JSON type is refused, as by the core', async ({
+    page,
+  }) => {
+    const api = await fakeApi(page);
+    api.on('POST /api/v1/projects/shop/start', () => ({ status: 204 }));
+    await page.goto('/');
+    const statuses = await page.evaluate(async () => {
+      const post = (headers: Record<string, string>) =>
+        fetch('/api/v1/projects/shop/start', { method: 'POST', headers }).then((r) => r.status);
+      return [
+        await post({}),
+        await post({ 'Content-Type': 'application/json' }),
+        await post({ 'X-Nearhost-CSRF': 'token-1' }),
+        await post({ 'X-Nearhost-CSRF': 'token-1', 'Content-Type': 'application/json' }),
+      ];
+    });
+    expect(statuses).toEqual([403, 403, 403, 204]);
+    const missing = await page.evaluate(() =>
+      fetch('/api/v1/nowhere').then((r) => r.json() as Promise<{ code: string }>),
+    );
+    expect(missing.code).toBe('control.not-found');
   });
 
   test('not paired says so', async ({ page }) => {

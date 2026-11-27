@@ -13,6 +13,8 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
   const client = createClient({ fetch: fake.fetch });
   const states: State[] = [];
   const envelopes: Envelope[] = [];
+  // The ones given out after a read that already included them.
+  const covered: Envelope[] = [];
   const statuses: Connection[] = [];
   const onReset = vi.fn();
   const controller = new AbortController();
@@ -27,7 +29,11 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
     document: doc,
     window: win,
     onState: (s) => states.push(s),
-    onEnvelope: (e) => {
+    onEnvelope: (e, { inState }) => {
+      if (inState) {
+        covered.push(e);
+        return true;
+      }
       envelopes.push(e);
       return refetch?.(e);
     },
@@ -38,6 +44,7 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
     fake,
     states,
     envelopes,
+    covered,
     statuses,
     onReset,
     controller,
@@ -139,8 +146,9 @@ describe('openEvents', () => {
     await settle();
     expect(t.fake.count(getState)).toBe(2);
     expect(t.states.map((s) => s.seq)).toEqual([5, 8]);
-    // 8 is in the new state; 9 comes after it.
+    // 8 is in the new state, and still given out as such; 9 comes after it.
     expect(t.envelopes.map((e) => e.seq)).toEqual([9]);
+    expect(t.covered.map((e) => e.seq)).toEqual([8]);
   });
 
   it('marks a dropped stream lost and reconnects on the backoff schedule', async () => {
@@ -520,6 +528,8 @@ describe('openEvents', () => {
       expect(t.fake.count(getState)).toBe(2);
       expect(t.states.map((s) => s.seq)).toEqual([5, 8]);
       expect(t.envelopes.map((e) => e.seq)).toEqual([6]);
+      // Every one of the burst is still given out, once; asking for a read from one does nothing.
+      expect(t.covered.map((e) => e.seq)).toEqual([7, 8]);
     });
 
     it('reads once more for one that came after what the read includes', async () => {
@@ -540,6 +550,61 @@ describe('openEvents', () => {
       expect(t.fake.count(getState)).toBe(3);
       expect(t.states.map((s) => s.seq)).toEqual([5, 6, 8]);
       expect(t.envelopes.map((e) => e.seq)).toEqual([6, 7]);
+      expect(t.covered.map((e) => e.seq)).toEqual([8]);
+    });
+
+    it('gives out what a reset read includes, from the new numbers', async () => {
+      const t = setup(50);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      const read = pending();
+      t.fake.on(getState, read.route);
+      es.send({ seq: 2, kind: 'reset' });
+      es.send(envelope(3, { kind: 'shown' }));
+      await settle();
+      read.answer(json(state(3)));
+      await settle();
+      expect(t.covered.map((e) => e.seq)).toEqual([3]);
+      es.send(envelope(4));
+      expect(t.envelopes.map((e) => e.seq)).toEqual([4]);
+    });
+
+    it('does not spin on a gap the read does not close', async () => {
+      // A state that never reaches the stream's numbers, as from a fake core whose seq stands.
+      const t = setup(5);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      es.send(envelope(8));
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      expect(es.closed).toBe(true);
+      expect(t.statuses.at(-1)).toBe('lost');
+      await vi.advanceTimersByTimeAsync(999);
+      expect(t.fake.count(getState)).toBe(2);
+      await vi.advanceTimersByTimeAsync(1);
+      await settle();
+      expect(t.fake.count(getState)).toBe(3);
+      expect(FakeEventSource.last.url).toBe('/api/v1/events?after=5');
+    });
+
+    it('reads again for a gap after a newer state, once', async () => {
+      const t = setup(5);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      const read = pending();
+      t.fake.on(getState, read.route);
+      es.send(envelope(7));
+      es.send(envelope(9));
+      await settle();
+      t.fake.on(getState, () => json(state(9)));
+      read.answer(json(state(7)));
+      await settle();
+      expect(t.fake.count(getState)).toBe(3);
+      expect(es.closed).toBe(false);
+      expect(t.covered.map((e) => e.seq)).toEqual([7, 9]);
     });
   });
 

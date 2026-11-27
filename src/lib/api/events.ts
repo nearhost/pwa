@@ -37,11 +37,13 @@ export interface EventsOptions {
   /** A state read at the start, after a reset or a gap, and on each reconnect. */
   onState(state: State): void;
   /**
-   * Each envelope numbered after the state, in order, once. Returning true reads the state again
-   * (envelopes that arrive meanwhile wait, and the ones the new state includes are dropped, so a
-   * burst of them costs one read).
+   * Each envelope the stream carries, in order, once. Returning true reads the state again:
+   * envelopes that arrive meanwhile wait, and so a burst of them costs one read. Those the new
+   * state already includes still come here, after it, with inState set: the state needs nothing
+   * from them, but whoever follows logs or actions does. Returning true for one of those does
+   * nothing.
    */
-  onEnvelope(envelope: Envelope): boolean | void;
+  onEnvelope(envelope: Envelope, info: { inState: boolean }): boolean | void;
   /** A reset arrived; the state is being read again. */
   onReset?(): void;
   onStatus?(status: Connection): void;
@@ -151,7 +153,8 @@ export function openEvents(opts: EventsOptions): void {
     }
     if (envelope.kind === 'reset') {
       opts.onReset?.();
-      void resync([]);
+      // After a reset the numbers start again: anything the new state includes is news.
+      void resync([], -1);
       return;
     }
     if (envelope.seq <= seq) return;
@@ -160,10 +163,12 @@ export function openEvents(opts: EventsOptions): void {
       return;
     }
     seq = envelope.seq;
-    if (opts.onEnvelope(envelope) === true) void resync([]);
+    if (opts.onEnvelope(envelope, { inState: false }) === true) void resync([]);
   }
 
-  async function resync(waiting: Envelope[]) {
+  // Reads the state again, holding what arrives meanwhile. floor is the seq every envelope up to
+  // which was already given to onEnvelope.
+  async function resync(waiting: Envelope[], floor = seq) {
     const g = generation;
     held = waiting;
     try {
@@ -174,8 +179,30 @@ export function openEvents(opts: EventsOptions): void {
     }
     const replay = held;
     held = undefined;
-    // Ones in the state are dropped; a gap left after it reads the state once more.
-    for (const envelope of replay) receive(envelope);
+    const advanced = seq > floor;
+    for (const envelope of replay) {
+      if (!current(g)) return;
+      // An envelope in the replay asked for another read: the rest wait for that one.
+      // (receive may have set held since the loop began, which TypeScript cannot see.)
+      const waiting = held as Envelope[] | undefined;
+      if (waiting) {
+        waiting.push(envelope);
+        continue;
+      }
+      if (envelope.kind !== 'reset' && envelope.seq <= seq) {
+        // In the state already, but never given out: give it out as such.
+        if (envelope.seq > floor) opts.onEnvelope(envelope, { inState: true });
+        continue;
+      }
+      // A gap the read did not close, from a state no newer than before it: reading again at
+      // once would only spin. Drop the stream and come back through the backoff.
+      if (envelope.kind !== 'reset' && envelope.seq > seq + 1 && !advanced) {
+        fail();
+        return;
+      }
+      // A gap after a newer state reads it once more.
+      receive(envelope);
+    }
   }
 
   function close() {

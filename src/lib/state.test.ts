@@ -10,7 +10,7 @@ import {
   state,
 } from '#lib/api/testing.js';
 import type { State } from '#lib/api/types.js';
-import { appState, startState } from './state.svelte.js';
+import { appState, followEnvelopes, startState } from './state.svelte.js';
 
 async function settle() {
   for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -217,6 +217,33 @@ describe('startState', () => {
       await settle();
       expect(t.fake.count('GET /api/v1/state')).toBe(2);
       expect(appState.state?.clients).toBe(3);
+    });
+
+    it('and still gives followers every envelope that came during the read', async () => {
+      const shop = { State: 'running', Message: '' } as NonNullable<State['projects']>[string];
+      const t = await live(state(5, { projects: { shop } }));
+      const seen: string[] = [];
+      const stopFollowing = followEnvelopes((e, { inState }) =>
+        seen.push(`${e.seq} ${e.kind}${inState ? ' in state' : ''}`),
+      );
+      let answer!: (r: Response) => void;
+      t.fake.on('GET /api/v1/state', () => new Promise<Response>((r) => (answer = r)));
+      const es = FakeEventSource.last;
+      es.send(envelope(6, { kind: 'config' }));
+      es.send(
+        envelope(7, {
+          event: { Time: '', Project: 'shop', Server: '', State: '', Message: 'log' },
+        }),
+      );
+      es.send(envelope(8, { kind: 'shown' }));
+      await settle();
+      answer(json(state(8, { projects: { shop: { ...shop, State: 'stopped' } } })));
+      await settle();
+      stopFollowing();
+      expect(seen).toEqual(['6 config', '7 event in state', '8 shown in state']);
+      // The covered ones change nothing in the state, and ask for no read of their own.
+      expect(appState.state?.projects?.shop?.State).toBe('stopped');
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
     });
 
     it('not on a project log line or a known project state change', async () => {

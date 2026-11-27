@@ -78,6 +78,11 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
       await page.evaluate(() => window.__nearhostFakeEvents!.instances.at(-1)!.open());
     },
     async send(...envelopes) {
+      // As the core's: the state is as new as everything sent (a reset starts the numbers again),
+      // so a read the app makes after these never leaves a gap behind it.
+      for (const e of envelopes) {
+        api.state.seq = e.kind === 'reset' ? e.seq : Math.max(api.state.seq, e.seq);
+      }
       await page.evaluate((all) => {
         const last = window.__nearhostFakeEvents!.instances.at(-1)!;
         for (const e of all) last.message(JSON.stringify(e));
@@ -168,6 +173,21 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
         code: 'proxy.api-sign-in',
       });
     }
+    // The core's gate: a write needs the session's token and says it is JSON, body or not.
+    if (fake.method !== 'GET' && fake.method !== 'HEAD') {
+      const headers = request.headers();
+      if (
+        headers['x-nearhost-csrf'] !== session.csrf ||
+        !headers['content-type']?.startsWith('application/json')
+      ) {
+        return json(403, {
+          error: 'Write refused',
+          title: 'Write refused',
+          status: 403,
+          code: 'proxy.api-write-refused',
+        });
+      }
+    }
     const handler = handlers.get(`${fake.method} ${url.pathname}`);
     if (handler) {
       const answer = await handler(fake);
@@ -179,6 +199,7 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
       error: 'Not found',
       title: `The fake API has no route for ${fake.method} ${url.pathname}`,
       status: 404,
+      code: 'control.not-found',
     });
   });
 

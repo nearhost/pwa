@@ -16,6 +16,28 @@ export interface AppState {
 
 export const appState: AppState = $state({ connection: 'connecting' });
 
+/** What a follower of the stream is told with each envelope. */
+export interface EnvelopeInfo {
+  /** The state already included it when it came, so it changed nothing there. */
+  inState: boolean;
+}
+
+type Follower = (envelope: Envelope, info: EnvelopeInfo) => void;
+
+// Who follows the stream is not state anything renders.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const followers = new Set<Follower>();
+
+/**
+ * Calls follower with every envelope the stream carries, in order, once, after the state has taken
+ * it in: log lines, opened passthroughs and shown documents included. Until the returned function
+ * is called.
+ */
+export function followEnvelopes(follower: Follower): () => void {
+  followers.add(follower);
+  return () => void followers.delete(follower);
+}
+
 export function startState(
   client: Client,
   opts: { EventSource?: EventsOptions['EventSource'] } = {},
@@ -58,10 +80,13 @@ export function startState(
       appState.state = state;
       if (!appState.session) void readSession();
     },
-    onEnvelope(envelope) {
+    onEnvelope(envelope, info) {
       answered();
-      // Without a state there is nothing to bring up to date: read it.
-      return appState.state ? applyEnvelope(appState.state, envelope) : true;
+      // One the state already includes changes nothing there; without a state, read it.
+      let again = false;
+      if (!info.inState) again = appState.state ? applyEnvelope(appState.state, envelope) : true;
+      for (const follower of followers) follower(envelope, info);
+      return again;
     },
     onStatus(status) {
       if (status === 'live') answered();
