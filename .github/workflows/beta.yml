@@ -1,0 +1,143 @@
+# Publishes a beta from every push to release-please's release PR, so the
+# core can try the next release (go get github.com/nearhost/pwa@vX.Y.Z-beta.N)
+# before the release PR is merged.
+#
+# It starts from the push to the PR's branch, not from the pull request,
+# because pull_request runs are what other people's branches could trigger.
+# The branch is release-please's for the component "build"
+# (release-please-config.json); CI's release-config job checks the two agree.
+#
+# Each beta is the release PR's version (.release-please-manifest.json) plus
+# -beta.N, one past the highest build/v tag of that version
+# (.github/scripts/beta-version.sh), so the first push that bumps the version
+# makes build/v0.2.0-beta.1, the next build/v0.2.0-beta.2, and so on. A push
+# whose version is already released, or is still the manifest's 0.0.0 before
+# the first release, makes nothing: release-please first pushes the branch at
+# main's own commit, before the bump.
+#
+# This workflow builds nothing. It creates a GitHub prerelease, tagged
+# build/vX.Y.Z-beta.N, with the app's token, which, unlike GITHUB_TOKEN,
+# starts release.yml. That builds the app, pushes the Go module's tag
+# vX.Y.Z-beta.N (a Go prerelease, which `go get @latest` passes over) and adds
+# it to the prerelease's notes. release-please ignores the beta: it finds the
+# last release by the version in .release-please-manifest.json, and a beta's
+# tag never equals that.
+#
+# Running it by hand from the Actions tab ("Run workflow") works only on the
+# release PR's branch, and publishes the next beta from it, with a fixed line
+# for notes if no release PR is open. Any other branch is refused.
+name: beta
+on:
+  push:
+    branches: [release-please--branches--main--components--build]
+  workflow_dispatch:
+permissions: {}
+# One beta at a time. Each run numbers its beta from the tags it fetches, so
+# two at once could pick the same number. Not cancelled in progress: a later
+# push must not stop a beta part way through publishing.
+concurrency:
+  group: beta
+  cancel-in-progress: false
+jobs:
+  beta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      BRANCH: release-please--branches--main--components--build
+    steps:
+      # A dispatch can be started on any branch; only the release PR's makes
+      # betas.
+      - name: Check the branch
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/$BRANCH" ]; then
+            echo "::error::betas are published only from $BRANCH, not $GITHUB_REF"
+            exit 1
+          fi
+      # Every tag, so beta-version.sh sees the release and betas already made.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # Only the branch's newest commit makes a beta: a run that waited behind
+      # another, or a rerun of an old run, would otherwise publish a stale
+      # commit as the newest beta.
+      - name: Number the beta
+        id: version
+        run: |
+          head=$(git rev-parse "origin/$BRANCH")
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::$BRANCH has moved on to $head; no beta from the older $GITHUB_SHA"
+            echo "beta=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version=$(jq -r '."."' .release-please-manifest.json)
+          code=0
+          beta=$(git tag -l | sh .github/scripts/beta-version.sh "$version") || code=$?
+          case "$code" in
+            0)
+              echo "Publishing $beta"
+              echo "beta=$beta" >> "$GITHUB_OUTPUT" ;;
+            2)
+              echo "::notice::$version is already released, or not yet bumped; no beta from this push"
+              echo "beta=" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
+      # Each run numbers its beta from the tags it fetched, so the tag is new
+      # unless something else made it since: then run the workflow again.
+      - name: Check the tag is new
+        if: steps.version.outputs.beta != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BETA: ${{ steps.version.outputs.beta }}
+        run: |
+          if out=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/build/v$BETA" 2>&1); then
+            echo "::error::Tag build/v$BETA already exists. Run the workflow again to publish the next beta."
+            exit 1
+          fi
+          case "$out" in
+            *"HTTP 404"*) echo "build/v$BETA is new" ;;
+            *) echo "$out"; exit 1 ;;
+          esac
+      # The release PR's body is release-please's changelog for this version,
+      # less release-please's own wording around it. Through a file, so a long
+      # body or its quotes and backticks reach gh as they are.
+      - name: Write the release notes
+        if: steps.version.outputs.beta != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list --head "$BRANCH" --repo "$GITHUB_REPOSITORY" --json body -q '.[0].body // ""' \
+            | awk '
+                NR == 1 && /^:robot:/ { intro = 1; next }
+                intro && /^---$/ { intro = 0; next }
+                intro { next }
+                { line[++n] = $0 }
+                END {
+                  for (i = n; i > 0; i--)
+                    if (line[i] == "---" && line[i + 1] ~ /^This PR was generated/) { n = i - 1; break }
+                  for (i = 1; i <= n; i++) print line[i]
+                }' > "$RUNNER_TEMP/notes.md"
+          # No open PR prints an empty line, so look for any text at all.
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "A beta of the next release, built from the release pull request." > "$RUNNER_TEMP/notes.md"
+          fi
+      # The app's token, unlike GITHUB_TOKEN, starts release.yml.
+      - uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        if: steps.version.outputs.beta != ''
+        id: app-token
+        with:
+          client-id: ${{ vars.NH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NH_APP_PRIVATE_KEY }}
+          permission-contents: write
+      # Titled like release-please's own releases ("build: v0.2.0").
+      - name: Publish the prerelease
+        if: steps.version.outputs.beta != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BETA: ${{ steps.version.outputs.beta }}
+        run: |
+          gh release create "build/v$BETA" --prerelease --target "$GITHUB_SHA" \
+            --title "build: v$BETA" --notes-file "$RUNNER_TEMP/notes.md" \
+            --repo "$GITHUB_REPOSITORY"

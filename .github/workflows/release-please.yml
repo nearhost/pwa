@@ -1,0 +1,38 @@
+# Keeps release-please's release PR open on main: it bumps package.json,
+# package-lock.json and .release-please-manifest.json and writes CHANGELOG.md
+# from the conventional commits since the last release. Merging the PR makes
+# release-please tag the merge commit build/vX.Y.Z and publish the GitHub
+# release of that tag, which starts release.yml: that builds the app and
+# pushes the Go module's tag vX.Y.Z. Every push to the PR's branch also makes
+# a beta (beta.yml).
+#
+# The tag is build/vX.Y.Z, not vX.Y.Z, because vX.Y.Z is the Go module's
+# version and belongs on the release commit that carries dist/, which
+# release.yml makes. release-please-config.json gets it from the component
+# "build" and the tag separator "/".
+name: release-please
+on:
+  push:
+    branches: [main]
+permissions: {}
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # The app's token, unlike GITHUB_TOKEN, starts CI and beta.yml on the
+      # release PR and release.yml on the release it publishes.
+      - uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        id: app-token
+        with:
+          client-id: ${{ vars.NH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

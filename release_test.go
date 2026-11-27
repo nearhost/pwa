@@ -23,8 +23,23 @@ func TestReleaseCarriesTheBuild(t *testing.T) {
 	}
 }
 
+// A release is X.Y.Z and a beta X.Y.Z-beta.N, as scripts/release.sh accepts.
+var releaseVersion = regexp.MustCompile(`^\d+\.\d+\.\d+(-beta\.\d+)?$`)
+
 func TestReleaseVersion(t *testing.T) {
-	if !regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(Version) {
-		t.Fatalf("Version = %q, want X.Y.Z", Version)
+	if !releaseVersion.MatchString(Version) {
+		t.Fatalf("Version = %q, want X.Y.Z or X.Y.Z-beta.N", Version)
+	}
+}
+
+func TestReleaseVersionPattern(t *testing.T) {
+	for v, want := range map[string]bool{
+		"0.1.0": true, "12.34.56": true, "0.1.0-beta.1": true, "0.1.0-beta.12": true,
+		"dev": false, "0.1": false, "v0.1.0": false, "0.1.0-rc.1": false, "0.1.0-beta": false,
+		"0.1.0-beta.1x": false, "0.1.0-beta.1-beta.2": false,
+	} {
+		if got := releaseVersion.MatchString(v); got != want {
+			t.Errorf("releaseVersion matches %q = %v, want %v", v, got, want)
+		}
 	}
 }
