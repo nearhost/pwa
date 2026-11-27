@@ -11,6 +11,12 @@ import type { Envelope, State } from './types.js';
 
 export type Connection = 'connecting' | 'live' | 'lost' | 'signed-out';
 
+/** How long a state read may take before it counts as a failure. */
+export const readTimeout = 8000;
+
+/** After a wake, how long the old status stands before it turns to connecting. */
+export const wakeGrace = 400;
+
 /** The waits before each try after a drop; the last one repeats. */
 export const backoff = [1000, 2000, 5000, 10000] as const;
 
@@ -51,15 +57,31 @@ export function openEvents(opts: EventsOptions): void {
   let generation = 0;
   let stopped = false;
 
+  let shown: Connection = 'connecting';
+  let grace: ReturnType<typeof setTimeout> | undefined;
   const status = (s: Connection) => {
-    if (!signal.aborted) opts.onStatus?.(s);
+    clearTimeout(grace);
+    if (signal.aborted) return;
+    shown = s;
+    opts.onStatus?.(s);
   };
 
   const current = (g: number) => g === generation && !signal.aborted;
 
   // Reads the state for connection g. False when g has been replaced meanwhile.
   async function load(g: number): Promise<boolean> {
-    const state = await client.get('/v1/state');
+    // A read that hangs (a network that cannot reach the machine) fails after readTimeout.
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(new DOMException('The state read took too long', 'TimeoutError')),
+      readTimeout,
+    );
+    let state;
+    try {
+      state = await client.get('/v1/state', { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!current(g)) return false;
     seq = state.seq;
     opts.onState(state);
@@ -162,6 +184,12 @@ export function openEvents(opts: EventsOptions): void {
     clearTimeout(timer);
     close();
     attempt = 0;
+    // The stream that looked live may be half-open: unless the new one opens within the grace,
+    // say so. Live comes back only from the new stream's onopen.
+    if (shown === 'live') {
+      clearTimeout(grace);
+      grace = setTimeout(() => status('connecting'), wakeGrace);
+    }
     void connect();
   }
 
@@ -182,6 +210,7 @@ export function openEvents(opts: EventsOptions): void {
 
   signal.addEventListener('abort', () => {
     clearTimeout(timer);
+    clearTimeout(grace);
     close();
     doc?.removeEventListener('visibilitychange', onVisibility);
     win?.removeEventListener('online', reconnect);

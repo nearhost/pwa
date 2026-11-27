@@ -336,4 +336,80 @@ describe('openEvents', () => {
       expect(u.fake.count(getState)).toBe(reads);
     });
   });
+
+  describe('after a wake', () => {
+    async function wakeWithHangingRead() {
+      const t = setup(5);
+      await settle();
+      FakeEventSource.last.open();
+      expect(t.statuses.at(-1)).toBe('live');
+      const hang = pending();
+      t.fake.on(getState, hang.route);
+      t.win.dispatchEvent(new Event('online'));
+      await settle();
+      return { t, hang };
+    }
+
+    it('says connecting, not live, once the wake read has run past 400 ms', async () => {
+      const { t } = await wakeWithHangingRead();
+      await vi.advanceTimersByTimeAsync(399);
+      expect(t.statuses.at(-1)).toBe('live');
+      await vi.advanceTimersByTimeAsync(1);
+      expect(t.statuses.at(-1)).toBe('connecting');
+    });
+
+    it('says live again only when the new stream opens', async () => {
+      const { t, hang } = await wakeWithHangingRead();
+      await vi.advanceTimersByTimeAsync(400);
+      hang.answer(json(state(9)));
+      await settle();
+      expect(t.statuses.at(-1)).toBe('connecting');
+      FakeEventSource.last.open();
+      expect(t.statuses.at(-1)).toBe('live');
+    });
+
+    it('does not flash connecting when the stream is back within 400 ms', async () => {
+      const { t, hang } = await wakeWithHangingRead();
+      hang.answer(json(state(9)));
+      await settle();
+      FakeEventSource.last.open();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(t.statuses).not.toContain('lost');
+      expect(t.statuses.slice(1)).toEqual(['live', 'live']);
+    });
+
+    it('gives up a state read after 8 s: lost, then the backoff', async () => {
+      const { t } = await wakeWithHangingRead();
+      const reads = t.fake.count(getState);
+      await vi.advanceTimersByTimeAsync(7999);
+      expect(t.statuses.at(-1)).toBe('connecting');
+      await vi.advanceTimersByTimeAsync(1);
+      await settle();
+      expect(t.statuses.at(-1)).toBe('lost');
+      t.fake.on(getState, () => json(state(12)));
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(t.fake.count(getState)).toBe(reads + 1);
+      expect(FakeEventSource.last.url).toBe('/api/v1/events?after=12');
+    });
+  });
+
+  it('gives up a hanging first state read after 8 s', async () => {
+    const fake = fakeFetch();
+    fake.on(getState, pending().route);
+    const statuses: Connection[] = [];
+    openEvents({
+      client: createClient({ fetch: fake.fetch }),
+      signal: new AbortController().signal,
+      EventSource: FakeEventSource,
+      document: Object.assign(new EventTarget(), { visibilityState: 'visible' as const }),
+      window: new EventTarget(),
+      onState: () => {},
+      onEnvelope: () => {},
+      onStatus: (s) => statuses.push(s),
+    });
+    await vi.advanceTimersByTimeAsync(8000);
+    await settle();
+    expect(statuses).toEqual(['connecting', 'lost']);
+  });
 });

@@ -48,7 +48,8 @@ export interface Client {
   url(path: string): string;
   /** Reads the session, keeping its token for writes. */
   session(): Promise<Session>;
-  get<P extends GetPaths>(path: P): Promise<Response200<P>>;
+  /** Reads path; a signal ends the read early, as fetch's does. */
+  get<P extends GetPaths>(path: P, init?: { signal?: AbortSignal }): Promise<Response200<P>>;
   send<P extends WritePaths, M extends MethodsOf<P>>(
     method: M,
     path: P,
@@ -128,7 +129,7 @@ export function createClient(opts: { base?: string; fetch?: typeof fetch } = {})
     base,
     url,
     session,
-    get: (path) => request('GET', path) as Promise<never>,
+    get: (path, init) => request('GET', path, { signal: init?.signal }) as Promise<never>,
     async send(method, path, body, params) {
       const filled = fill(path, params as Record<string, string> | undefined);
       const csrf = await (token ?? session().then((s) => s.csrf));

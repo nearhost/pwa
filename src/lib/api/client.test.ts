@@ -182,4 +182,13 @@ describe('createClient', () => {
     expectTypeOf<ParamsOf<'/v1/stop'>>().toEqualTypeOf<undefined>();
     expect(true).toBe(true);
   });
+
+  it('passes a signal to a read, and rejects when it aborts', async () => {
+    const { fake, client } = setup();
+    fake.on('GET /api/v1/state', () => new Promise<Response>(() => {}));
+    const controller = new AbortController();
+    const read = client.get('/v1/state', { signal: controller.signal });
+    controller.abort(new DOMException('gave up', 'TimeoutError'));
+    await expect(read).rejects.toThrow('gave up');
+  });
 });

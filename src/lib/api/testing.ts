@@ -34,7 +34,16 @@ export function fakeFetch(): FakeFetch {
     calls.push(call);
     const route = routes.get(`${method} ${path}`);
     if (!route) throw new TypeError(`fake fetch: no route for ${method} ${path}`);
-    return route(call);
+    const signal = init?.signal;
+    if (!signal) return route(call);
+    // As fetch does, a request whose signal aborts rejects with the signal's reason.
+    signal.throwIfAborted();
+    return Promise.race([
+      route(call),
+      new Promise<never>((_, reject) =>
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+      ),
+    ]);
   };
   return {
     fetch: impl as typeof fetch,
