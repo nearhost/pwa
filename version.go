@@ -1,4 +1,4 @@
 package pwa
 
-// Version is "dev" on main. scripts/release.sh rewrites it in the release commit.
-const Version = "dev"
+// Version is the release this commit was built as. Set by scripts/release.sh.
+const Version = "0.1.0-beta.1"

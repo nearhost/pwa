@@ -1,0 +1,1 @@
+import{h as e,p as t}from"../chunks/CFJ8K6nD.js";var n=e(`<p>Your projects, previews and agents' requests will appear here.</p>`);function r(e){var r=n();t(e,r)}export{r as component};
