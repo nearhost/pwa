@@ -6,7 +6,7 @@ import type { Envelope, State } from './types.js';
 
 const getState = 'GET /api/v1/state';
 
-function setup(firstSeq = 5) {
+function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
   const fake = fakeFetch();
   let seq = firstSeq;
   fake.on(getState, () => json(state(seq)));
@@ -27,7 +27,10 @@ function setup(firstSeq = 5) {
     document: doc,
     window: win,
     onState: (s) => states.push(s),
-    onEnvelope: (e) => envelopes.push(e),
+    onEnvelope: (e) => {
+      envelopes.push(e);
+      return refetch?.(e);
+    },
     onReset,
     onStatus: (s) => statuses.push(s),
   });
@@ -256,8 +259,13 @@ describe('openEvents', () => {
       await settle();
       expect(healthy.closed).toBe(false);
       expect(t.statuses.at(-1)).toBe('live');
-      await vi.advanceTimersByTimeAsync(60000);
+      // The core's heartbeats keep the new stream live meanwhile.
+      for (let i = 0; i < 4; i++) {
+        await vi.advanceTimersByTimeAsync(15000);
+        healthy.heartbeat();
+      }
       expect(FakeEventSource.instances.length).toBe(opened);
+      expect(t.statuses.at(-1)).toBe('live');
     });
   });
 
@@ -391,6 +399,147 @@ describe('openEvents', () => {
       await settle();
       expect(t.fake.count(getState)).toBe(reads + 1);
       expect(FakeEventSource.last.url).toBe('/api/v1/events?after=12');
+    });
+  });
+
+  describe('the heartbeat', () => {
+    it('listens for the heartbeat event by name', async () => {
+      setup(5);
+      await settle();
+      expect(FakeEventSource.last.listeners.get('heartbeat')).toHaveLength(1);
+    });
+
+    it('stays live while heartbeats or envelopes come within 40 s', async () => {
+      const t = setup(5);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      await vi.advanceTimersByTimeAsync(39_000);
+      es.heartbeat();
+      await vi.advanceTimersByTimeAsync(39_000);
+      es.send(envelope(6));
+      await vi.advanceTimersByTimeAsync(39_000);
+      es.heartbeat();
+      await vi.advanceTimersByTimeAsync(39_999);
+      expect(es.closed).toBe(false);
+      expect(t.statuses.at(-1)).toBe('live');
+      expect(t.fake.count(getState)).toBe(1);
+    });
+
+    it('says lost after 40 s with no event of any kind, and reconnects', async () => {
+      const t = setup(5);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      es.heartbeat();
+      await vi.advanceTimersByTimeAsync(39_999);
+      expect(t.statuses.at(-1)).toBe('live');
+      await vi.advanceTimersByTimeAsync(1);
+      expect(es.closed).toBe(true);
+      expect(t.statuses.at(-1)).toBe('lost');
+      t.setSeq(9);
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      expect(FakeEventSource.last).not.toBe(es);
+      expect(FakeEventSource.last.url).toBe('/api/v1/events?after=9');
+      FakeEventSource.last.open();
+      expect(t.statuses.at(-1)).toBe('live');
+    });
+
+    it('says lost when a stream never opens and stays silent for 40 s', async () => {
+      const t = setup(5);
+      await settle();
+      const es = FakeEventSource.last;
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(es.closed).toBe(true);
+      expect(t.statuses.at(-1)).toBe('lost');
+    });
+
+    it('ignores a heartbeat from a stream it has dropped', async () => {
+      const t = setup(5);
+      await settle();
+      const first = FakeEventSource.last;
+      first.open();
+      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      const second = FakeEventSource.last;
+      second.open();
+      await vi.advanceTimersByTimeAsync(30_000);
+      first.heartbeat();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(second.closed).toBe(true);
+      expect(t.statuses.at(-1)).toBe('lost');
+    });
+
+    it('stops watching once aborted', async () => {
+      const t = setup(5);
+      await settle();
+      FakeEventSource.last.open();
+      t.controller.abort();
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(t.statuses).toEqual(['connecting', 'live']);
+      expect(FakeEventSource.instances.length).toBe(1);
+    });
+  });
+
+  describe('a refetch asked for by an envelope', () => {
+    const isConfig = (e: Envelope) => e.kind === 'config';
+
+    it('reads the state again and goes on from it', async () => {
+      const t = setup(5, isConfig);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      t.setSeq(6);
+      es.send(envelope(6, { kind: 'config' }));
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      expect(t.states.map((s) => s.seq)).toEqual([5, 6]);
+      expect(t.envelopes.map((e) => e.seq)).toEqual([6]);
+      es.send(envelope(7));
+      expect(t.envelopes.map((e) => e.seq)).toEqual([6, 7]);
+      expect(es.closed).toBe(false);
+    });
+
+    it('reads once for a burst the read already includes', async () => {
+      const t = setup(5, isConfig);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      const read = pending();
+      t.fake.on(getState, read.route);
+      es.send(envelope(6, { kind: 'config' }));
+      es.send(envelope(7, { kind: 'config' }));
+      es.send(envelope(8, { kind: 'config' }));
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      read.answer(json(state(8)));
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      expect(t.states.map((s) => s.seq)).toEqual([5, 8]);
+      expect(t.envelopes.map((e) => e.seq)).toEqual([6]);
+    });
+
+    it('reads once more for one that came after what the read includes', async () => {
+      const t = setup(5, isConfig);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      const read = pending();
+      t.fake.on(getState, read.route);
+      es.send(envelope(6, { kind: 'config' }));
+      es.send(envelope(7, { kind: 'config' }));
+      es.send(envelope(8, { kind: 'config' }));
+      await settle();
+      t.setSeq(8);
+      t.fake.on(getState, () => json(state(8)));
+      read.answer(json(state(6)));
+      await settle();
+      expect(t.fake.count(getState)).toBe(3);
+      expect(t.states.map((s) => s.seq)).toEqual([5, 6, 8]);
+      expect(t.envelopes.map((e) => e.seq)).toEqual([6, 7]);
     });
   });
 

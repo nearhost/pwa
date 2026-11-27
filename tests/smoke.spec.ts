@@ -16,13 +16,15 @@ function watchForErrors(page: Page): string[] {
 test('the home page renders the app', async ({ page }) => {
   const errors = watchForErrors(page);
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Nearhost' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Nearhost' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
 test('a deep link renders the app too', async ({ page }) => {
   const errors = watchForErrors(page);
-  await page.goto('/some/deep/link');
-  await expect(page.getByRole('heading', { level: 1, name: 'Nearhost' })).toBeVisible();
+  await page.goto('/projects/shop');
+  await expect(page.getByRole('link', { name: 'Nearhost' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'shop' })).toBeVisible();
   expect(errors).toEqual([]);
 });

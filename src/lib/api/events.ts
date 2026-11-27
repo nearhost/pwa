@@ -3,9 +3,10 @@
 // stream is retried after 1 s, 2 s, 5 s and then every 10 s, each try reading the state first, so
 // what a client shows is never older than the stream it follows. A 401 ends it all.
 //
-// The core's keep-alives are comments, which EventSource never surfaces, so a half-open stream
-// (an iPad that slept, a network that changed) looks open until TCP gives up. So it reconnects at
-// once when the page is shown again after being hidden, and when the browser is back online.
+// The core sends a `heartbeat` event every 15 s. A stream that has carried no event of any kind
+// for 40 s is half-open (an iPad that slept, a network that changed) and counts as dropped. It
+// also reconnects at once when the page is shown again after being hidden, and when the browser
+// is back online.
 import { NotSignedIn, type Client } from './client.js';
 import type { Envelope, State } from './types.js';
 
@@ -17,6 +18,9 @@ export const readTimeout = 8000;
 /** After a wake, how long the old status stands before it turns to connecting. */
 export const wakeGrace = 400;
 
+/** How long a stream may carry no event (the core's heartbeat is every 15 s) before it is lost. */
+export const silenceLimit = 40_000;
+
 /** The waits before each try after a drop; the last one repeats. */
 export const backoff = [1000, 2000, 5000, 10000] as const;
 
@@ -24,6 +28,7 @@ interface EventSourceLike {
   onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent) => void) | null;
   onerror: ((event: Event) => void) | null;
+  addEventListener(type: 'heartbeat', listener: (event: MessageEvent) => void): void;
   close(): void;
 }
 
@@ -31,8 +36,12 @@ export interface EventsOptions {
   client: Client;
   /** A state read at the start, after a reset or a gap, and on each reconnect. */
   onState(state: State): void;
-  /** Each envelope numbered after the state, in order, once. */
-  onEnvelope(envelope: Envelope): void;
+  /**
+   * Each envelope numbered after the state, in order, once. Returning true reads the state again
+   * (envelopes that arrive meanwhile wait, and the ones the new state includes are dropped, so a
+   * burst of them costs one read).
+   */
+  onEnvelope(envelope: Envelope): boolean | void;
   /** A reset arrived; the state is being read again. */
   onReset?(): void;
   onStatus?(status: Connection): void;
@@ -50,6 +59,8 @@ export function openEvents(opts: EventsOptions): void {
   let seq = 0;
   let source: EventSourceLike | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Fires when the stream has been silent for silenceLimit.
+  let silence: ReturnType<typeof setTimeout> | undefined;
   let attempt = 0;
   // While the state is read again, envelopes wait here.
   let held: Envelope[] | undefined;
@@ -99,13 +110,19 @@ export function openEvents(opts: EventsOptions): void {
     }
     const es = new Source(client.url(`/v1/events?after=${seq}`));
     source = es;
+    heard();
     es.onopen = () => {
       if (source !== es) return;
+      heard();
       attempt = 0;
       status('live');
     };
+    es.addEventListener('heartbeat', () => {
+      if (source === es) heard();
+    });
     es.onmessage = (event) => {
       if (source !== es) return;
+      heard();
       let envelope: Envelope;
       try {
         envelope = JSON.parse(String(event.data)) as Envelope;
@@ -118,6 +135,12 @@ export function openEvents(opts: EventsOptions): void {
       if (source !== es) return;
       fail();
     };
+  }
+
+  // The stream carried something: it is not half-open. Its silence is counted from now.
+  function heard() {
+    clearTimeout(silence);
+    silence = setTimeout(() => fail(), silenceLimit);
   }
 
   function receive(envelope: Envelope) {
@@ -137,7 +160,7 @@ export function openEvents(opts: EventsOptions): void {
       return;
     }
     seq = envelope.seq;
-    opts.onEnvelope(envelope);
+    if (opts.onEnvelope(envelope) === true) void resync([]);
   }
 
   async function resync(waiting: Envelope[]) {
@@ -156,6 +179,7 @@ export function openEvents(opts: EventsOptions): void {
   }
 
   function close() {
+    clearTimeout(silence);
     const es = source;
     source = undefined;
     es?.close();

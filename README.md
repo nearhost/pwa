@@ -20,6 +20,31 @@ npm run verify    # format, lint, type check, unit and end-to-end tests, then bu
 
 The app talks to the core only through `src/lib/api/`, with the types from [`@nearhost/api`](https://www.npmjs.com/package/@nearhost/api), pinned to the version of the core it is built for. `src/lib/api/types.ts` is the one file that imports them.
 
+### End-to-end tests and the fake API
+
+The Playwright tests in `tests/` run the built app (`vite preview`) against a fake core of their own, `tests/fake-api.ts`, one per page, so tests share nothing and run in parallel in both browsers:
+
+- **HTTP** is answered by Playwright route mocks on `**/api/**`: `GET /api/v1/session` and `GET /api/v1/state` answer by default (the state is `api.state`, a test may change it before the app reads it again), `api.on('POST /api/v1/projects/shop/start', handler)` answers any other request, and anything else gets a 404 problem that names the route. `api.requests` records every request with its parsed body. `fakeApi(page, { signedOut: true })` answers 401 everywhere.
+- **The event stream** is a stand-in `EventSource` an init script puts on the page before the app loads. It opens on its own unless the test passes `open: false` (then `await api.open()`); `api.send(envelope(6, { kind: 'config' }))`, `api.heartbeat()` and `api.drop()` drive it from the test.
+
+```ts
+import { envelope, fakeApi } from './fake-api.js';
+
+test('a project starts', async ({ page }) => {
+  const api = await fakeApi(page, { state: { projects: { shop } } }); // shop: a stopped ProjectStatus
+  api.on('POST /api/v1/projects/shop/start', () => ({ status: 204 }));
+  await page.goto('/');
+  // ...
+  await api.send(
+    envelope(2, {
+      event: { Time: '', Project: 'shop', Server: '', State: 'running', Message: 'state: running' },
+    }),
+  );
+});
+```
+
+The states and sessions come from the same builders as the unit tests' (`src/lib/api/testing.ts`). Journeys run at the canvas's three sizes (`tests/sizes.ts`) in both colour schemes. Locally, run Chromium with `npx playwright test --project=chromium --workers=2`; WebKit runs on a Mac.
+
 ### Developing against a running core
 
 The app calls the core's API at `/api` on its own origin. The dev server proxies `/api` to a core when `NEARHOST_CORE` names the core's page. Two things stand in the way of a browser on the dev server, and the proxy handles both:

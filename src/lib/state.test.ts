@@ -54,19 +54,27 @@ describe('startState', () => {
     expect(appState.state?.seq).toBe(5);
   });
 
-  it('applies envelopes after the state seq and ignores the rest', async () => {
+  it('applies approvals and their ends at once, before reading the state again', async () => {
     const t = setup(state(5, { approvals: [] }));
     stops.push(t.stop);
     await settle();
     const es = FakeEventSource.last;
     es.open();
+    let answer!: (r: Response) => void;
+    t.fake.on('GET /api/v1/state', () => new Promise<Response>((r) => (answer = r)));
     es.send({ seq: 5, kind: 'approval', approval: { ...approval, id: 'old' } });
     es.send({ seq: 6, kind: 'approval', approval });
     expect(appState.state?.seq).toBe(6);
     expect(appState.state?.approvals?.map((a) => a.id)).toEqual(['a1']);
+    answer(json(state(6, { approvals: [approval] })));
+    await settle();
+    t.fake.on('GET /api/v1/state', () => new Promise<Response>((r) => (answer = r)));
     es.send({ seq: 7, kind: 'ended', id: 'a1' });
     expect(appState.state?.approvals).toEqual([]);
     expect(appState.state?.seq).toBe(7);
+    answer(json(state(7, { approvals: [] })));
+    await settle();
+    expect(appState.state?.approvals).toEqual([]);
   });
 
   it("applies a project's state change", async () => {
@@ -87,6 +95,144 @@ describe('startState', () => {
       envelope(7, { event: { Time: '', Project: 'shop', Server: '', State: '', Message: 'hi' } }),
     );
     expect(appState.state?.projects?.shop?.State).toBe('running');
+  });
+
+  it("applies a project's state change fully: state, message and problem", async () => {
+    const shop = {
+      State: 'running',
+      Message: '',
+      Problem: null,
+    } as unknown as NonNullable<State['projects']>[string];
+    const t = setup(state(5, { projects: { shop } }));
+    stops.push(t.stop);
+    await settle();
+    const es = FakeEventSource.last;
+    es.open();
+    const report = { code: 'engine.port-taken', level: 'error', title: 'port 8000 is taken' };
+    es.send(
+      envelope(6, {
+        event: {
+          Time: '',
+          Project: 'shop',
+          Server: '',
+          State: 'error',
+          Message: 'state: error: port 8000 is taken',
+          Report: report as never,
+        },
+      }),
+    );
+    expect(appState.state?.projects?.shop?.State).toBe('error');
+    expect(appState.state?.projects?.shop?.Message).toBe('port 8000 is taken');
+    expect(appState.state?.projects?.shop?.Problem).toEqual(report);
+    // A log line leaves the message and the problem alone.
+    es.send(
+      envelope(7, { event: { Time: '', Project: 'shop', Server: '', State: '', Message: 'hi' } }),
+    );
+    expect(appState.state?.projects?.shop?.Message).toBe('port 8000 is taken');
+    es.send(
+      envelope(8, {
+        event: {
+          Time: '',
+          Project: 'shop',
+          Server: '',
+          State: 'running',
+          Message: 'state: running',
+        },
+      }),
+    );
+    expect(appState.state?.projects?.shop?.State).toBe('running');
+    expect(appState.state?.projects?.shop?.Message).toBe('');
+    expect(appState.state?.projects?.shop?.Problem).toBeNull();
+    expect(t.fake.count('GET /api/v1/state')).toBe(1);
+  });
+
+  describe('reads the state again', () => {
+    const server = (status: string) =>
+      ({ health: {}, status, message: '' }) as unknown as NonNullable<State['servers']>[string];
+
+    async function live(first: State) {
+      const t = setup(first);
+      stops.push(t.stop);
+      await settle();
+      FakeEventSource.last.open();
+      return t;
+    }
+
+    it("on a server's event, which carries no state of its own", async () => {
+      const t = await live(state(5, { servers: { box: server('connecting') } }));
+      t.fake.on('GET /api/v1/state', () =>
+        json(state(6, { servers: { box: server('connected') } })),
+      );
+      FakeEventSource.last.send(
+        envelope(6, {
+          event: { Time: '', Project: '', Server: 'box', State: '', Message: 'connected' },
+        }),
+      );
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
+      expect(appState.state?.servers?.box?.status).toBe('connected');
+    });
+
+    it('on a state change of a project it does not know yet', async () => {
+      const t = await live(state(5));
+      const shop = { State: 'starting' } as NonNullable<State['projects']>[string];
+      t.fake.on('GET /api/v1/state', () => json(state(6, { projects: { shop } })));
+      FakeEventSource.last.send(
+        envelope(6, {
+          event: { Time: '', Project: 'shop', Server: '', State: 'starting', Message: '' },
+        }),
+      );
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
+      expect(appState.state?.projects?.shop?.State).toBe('starting');
+    });
+
+    for (const kind of ['approval', 'ended', 'opened', 'shown', 'config', 'reset'] as const) {
+      it(`on ${kind === 'approval' || kind === 'ended' ? 'an' : 'a'} ${kind} envelope`, async () => {
+        const t = await live(state(5));
+        t.fake.on('GET /api/v1/state', () => json(state(6, { clients: 2 })));
+        FakeEventSource.last.send(
+          kind === 'approval' ? { seq: 6, kind, approval } : envelope(6, { kind }),
+        );
+        await settle();
+        expect(t.fake.count('GET /api/v1/state')).toBe(2);
+        expect(appState.state?.clients).toBe(2);
+      });
+    }
+
+    it('once for a burst of envelopes', async () => {
+      const t = await live(state(5));
+      let answer!: (r: Response) => void;
+      t.fake.on('GET /api/v1/state', () => new Promise<Response>((r) => (answer = r)));
+      const es = FakeEventSource.last;
+      es.send({ seq: 6, kind: 'approval', approval });
+      es.send(envelope(7, { kind: 'config' }));
+      es.send(envelope(8, { kind: 'shown' }));
+      es.send(
+        envelope(9, { event: { Time: '', Project: '', Server: 'box', State: '', Message: '' } }),
+      );
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
+      answer(json(state(9, { clients: 3 })));
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
+      expect(appState.state?.clients).toBe(3);
+    });
+
+    it('not on a project log line or a known project state change', async () => {
+      const shop = { State: 'starting', Message: '' } as NonNullable<State['projects']>[string];
+      const t = await live(state(5, { projects: { shop } }));
+      FakeEventSource.last.send(
+        envelope(6, { event: { Time: '', Project: 'shop', Server: '', State: '', Message: 'x' } }),
+      );
+      FakeEventSource.last.send(
+        envelope(7, {
+          event: { Time: '', Project: 'shop', Server: '', State: 'running', Message: '' },
+        }),
+      );
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(1);
+    });
   });
 
   it('says signed out on a 401', async () => {
