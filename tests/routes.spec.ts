@@ -7,7 +7,7 @@ import { schemes, sizes } from './sizes.js';
 const routes = [
   { path: '/', heading: 'Overview' },
   { path: '/projects/shop', heading: 'shop' },
-  { path: '/approve/a1', heading: 'Waiting for you' },
+  { path: '/approve/a1', heading: 'This request is no longer waiting' },
   { path: '/change/shop', heading: 'Change to shop' },
   { path: '/documents', heading: 'Documents' },
   { path: '/documents/storefront/plans/checkout.md', heading: 'checkout.md' },

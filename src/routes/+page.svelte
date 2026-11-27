@@ -7,7 +7,8 @@
   import Icon from '#lib/ui/Icon.svelte';
   import EmptyOverview from '#lib/overview/EmptyOverview.svelte';
   import MachineGroup from '#lib/overview/MachineGroup.svelte';
-  import { filterGroups, groupByMachine, waitingItems } from '#lib/overview/model.js';
+  import { filterGroups, groupByMachine } from '#lib/overview/model.js';
+  import WaitingList from '#lib/approvals/WaitingList.svelte';
 
   let query = $state('');
 
@@ -16,7 +17,6 @@
   const live = $derived(appState.connection === 'live');
   const groups = $derived(appState.state ? groupByMachine(appState.state, machine) : []);
   const shown = $derived(filterGroups(groups, query));
-  const waiting = $derived(waitingItems(appState.state));
   // An example address for the empty state, under the network's domain when the page is on it.
   const example = $derived(
     page.url.hostname.startsWith('nearhost.')
@@ -45,19 +45,7 @@
 
   <ConnectionNotice />
 
-  {#if waiting.length > 0}
-    <section class="waiting" id="waiting" aria-labelledby="waiting-heading">
-      <h2 id="waiting-heading" class="visually-hidden">Waiting for you</h2>
-      {#each waiting as item (item.key)}
-        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- waitingItems gives the app's own paths; the app is served at the root -->
-        <a href={item.href}>
-          <span class="clock"><Icon name="waiting" size={24} stroke={2} /></span>
-          <span class="what">{item.text}</span>
-          <span class="review">Review</span>
-        </a>
-      {/each}
-    </section>
-  {/if}
+  <WaitingList />
 
   {#if !appState.state}
     <p class="quiet" role="status">
@@ -163,52 +151,6 @@
     font-size: 12px;
   }
 
-  .waiting {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    scroll-margin-top: calc(var(--pwa-band) + 80px);
-  }
-
-  .waiting a {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 18px;
-    border-radius: var(--nh-radius-l);
-    background: var(--pwa-warn-bg);
-    border: 1px solid var(--pwa-warn-line);
-    color: var(--nh-text);
-    text-decoration: none;
-  }
-
-  .waiting a:focus-visible {
-    outline: 2px solid var(--nh-accent);
-    outline-offset: 2px;
-  }
-
-  .clock {
-    color: var(--pwa-starting);
-  }
-
-  .what {
-    flex: 1;
-    min-width: 0;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-
-  .review {
-    display: flex;
-    align-items: center;
-    height: 44px;
-    padding: 0 20px;
-    border-radius: var(--nh-radius-m);
-    background: var(--pwa-starting);
-    color: var(--pwa-on-warn);
-    font-weight: 600;
-  }
-
   .quiet {
     margin: 0;
     color: var(--nh-muted);
@@ -226,15 +168,6 @@
     .search {
       order: 3;
       width: 100%;
-    }
-
-    .waiting a {
-      padding: 14px;
-      gap: 12px;
-    }
-
-    .review {
-      display: none;
     }
   }
 </style>

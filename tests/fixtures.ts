@@ -71,3 +71,78 @@ export async function serveSites(page: Page, opts: { hang?: string[] } = {}) {
     });
   });
 }
+
+type Approval = NonNullable<State['approvals']>[number];
+type Change = NonNullable<Project['Pending']>;
+
+// Ten minutes from when the tests start: well inside every request's wait.
+const expires = new Date(Date.now() + 10 * 60_000).toISOString();
+
+/** Requests that wait for the user, as the core's state lists them. */
+export const requests = {
+  /** An agent's proposal to add billing on this machine, serving port 8000. */
+  proposal: (id: string, extra: Partial<NonNullable<Approval['proposal']>> = {}): Approval => ({
+    id,
+    proposal: {
+      ID: id,
+      Origin: 'local',
+      Path: '/home/ecs/Code/billing',
+      Name: 'billing',
+      Web: 8000,
+      Expires: expires,
+      ...extra,
+    },
+  }),
+  /** Claude Code on build-box asking to open its port 5173, for vite. */
+  pass: (id: string, extra: Partial<NonNullable<Approval['pass']>> = {}): Approval => ({
+    id,
+    pass: {
+      ID: id,
+      Origin: 'build-box',
+      Requester: 'claude-code',
+      Session: '',
+      Label: 'vite',
+      Remote: 5173,
+      LocalTaken: false,
+      CanAlways: true,
+      Expires: expires,
+      ...extra,
+    },
+  }),
+  /** Codex on this machine asking to show plans/checkout.md. */
+  doc: (id: string, extra: Partial<NonNullable<Approval['doc']>> = {}): Approval => ({
+    id,
+    doc: {
+      ID: id,
+      Origin: 'local',
+      Requester: 'codex',
+      Session: '',
+      Label: 'the plan',
+      Root: '/home/ecs/Code/shop/docs',
+      Doc: 'plans/checkout.md',
+      CanAlways: true,
+      NewRoot: false,
+      Expires: expires,
+      ...extra,
+    },
+  }),
+  /** storefront's .nearhostrc asking to serve shop.com and to bind localhost:3306. */
+  change: {
+    SHA256: 'abc123',
+    Project: {
+      Name: 'storefront',
+      Server: '',
+      Path: '/home/ecs/Code/storefront',
+      Alias: 'storefront.test',
+      Enabled: true,
+      Routes: [
+        { Port: 80, Role: 'web', Label: '', Hosts: ['shop.com'] },
+        { Port: 3306, Role: 'loopback', Label: 'mysql', Hosts: null },
+      ],
+    },
+    Items: [
+      { Port: 80, Host: 'shop.com', Why: 'a real domain', Option: '' },
+      { Port: 3306, Host: '', Why: 'binds localhost on this machine', Option: 'loopback' },
+    ],
+  } satisfies Change as Change,
+};

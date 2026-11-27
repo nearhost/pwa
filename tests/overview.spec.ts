@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { envelope, fakeApi } from './fake-api.js';
-import { canvas, project } from './fixtures.js';
+import { canvas, project, requests } from './fixtures.js';
 import { schemes, sizes } from './sizes.js';
 
 for (const size of sizes) {
@@ -43,7 +43,7 @@ for (const size of sizes) {
         await fakeApi(page, {
           state: {
             ...canvas,
-            approvals: [{ id: 'a1', proposal: { Name: 'billing' } }] as never,
+            approvals: [requests.proposal('a1')],
           },
         });
         await page.goto('/');
