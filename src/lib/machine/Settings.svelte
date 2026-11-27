@@ -33,9 +33,9 @@
 <h2 id="settings-heading">On this device</h2>
 <div class="grid">
   <div class="card">
-    <div class="label">Open projects in</div>
+    <div class="label" id="setting-open-in">Open projects in</div>
     <Segmented
-      label="Open projects in"
+      labelledby="setting-open-in"
       options={places}
       value={openIn}
       fill
@@ -46,9 +46,9 @@
     />
   </div>
   <div class="card">
-    <div class="label">Documents</div>
+    <div class="label" id="setting-document-style">Document style</div>
     <Segmented
-      label="Document theme"
+      labelledby="setting-document-style"
       options={themes}
       value={theme}
       fill
@@ -60,12 +60,12 @@
   </div>
   <div class="card wide">
     <div class="about">
-      <div class="label">Appearance</div>
+      <div class="label" id="setting-appearance">Appearance</div>
       <div class="note">System follows this device's light or dark setting.</div>
     </div>
     <div class="appearance">
       <Segmented
-        label="Appearance"
+        labelledby="setting-appearance"
         options={appearances}
         value={appearance}
         fill

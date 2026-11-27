@@ -75,7 +75,8 @@ for (const size of sizes) {
         await expect(devices(page).nth(1).getByRole('button')).toHaveAccessibleName('Revoke Phone');
 
         await expect(main.getByRole('heading', { name: 'On this device' })).toBeVisible();
-        for (const group of ['Open projects in', 'Document theme', 'Appearance']) {
+        // Each group is named by its visible label.
+        for (const group of ['Open projects in', 'Document style', 'Appearance']) {
           await expect(main.getByRole('radiogroup', { name: group })).toBeVisible();
         }
         // Nothing runs out sideways.
@@ -132,6 +133,37 @@ for (const size of sizes) {
         await expect(devices(page)).toHaveCount(2);
       });
 
+      test('while the answer is on its way, the dialog stays open', async ({ page }) => {
+        const api = await fakeApi(page, { session: { device: 'iPad Pro' } });
+        let answer: () => void = () => {};
+        // As the core's, once answered: the device is gone.
+        api.on(
+          'DELETE /api/v1/devices/Phone',
+          () =>
+            new Promise((resolve) => {
+              answer = () => {
+                api.devices = api.devices.filter((d) => d.name !== 'Phone');
+                resolve({ status: 204 });
+              };
+            }),
+        );
+        await page.goto('/machine');
+        await page.getByRole('button', { name: 'Revoke Phone' }).click();
+        const dialog = page.getByRole('dialog', { name: 'Revoke Phone?' });
+        await dialog.getByRole('button', { name: 'Revoke' }).click();
+        await expect(dialog.getByRole('button', { name: 'Revoking…' })).toBeDisabled();
+        // A second Escape the browser won't let the page cancel closes a dialog itself.
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeVisible();
+        answer();
+        await expect(dialog).toBeHidden();
+        await expect(devices(page)).toHaveCount(1);
+        // And it opens again afterwards.
+        await page.getByRole('button', { name: 'Unpair this device' }).click();
+        await expect(page.getByRole('dialog', { name: 'Unpair this device?' })).toBeVisible();
+      });
+
       test('unpairing this device lands on Not paired', async ({ page }) => {
         const api = await fakeApi(page, { session: { device: 'iPad Pro' } });
         await page.goto('/machine');
@@ -140,9 +172,11 @@ for (const size of sizes) {
         await expect(dialog).toContainText('nearhost pair');
         await dialog.getByRole('button', { name: 'Unpair' }).click();
         await expect(page.locator('[data-connection]')).toHaveText('Not paired');
-        await expect(
-          page.locator('main').getByRole('heading', { name: 'Pair this device with leto' }),
-        ).toBeVisible();
+        const heading = page
+          .locator('main')
+          .getByRole('heading', { name: 'Pair this device with leto' });
+        await expect(heading).toBeVisible();
+        await expect(heading).toBeFocused();
         expect(api.requests.filter((r) => r.method === 'DELETE').map((r) => r.path)).toEqual([
           '/api/v1/devices/iPad%20Pro',
         ]);
@@ -162,7 +196,9 @@ for (const size of sizes) {
         const revoke = page.getByRole('button', { name: 'Revoke Phone' });
         await expect(revoke).toBeDisabled();
         await expect(revoke).toHaveAttribute('aria-describedby', 'connection-reason');
-        await expect(page.locator('#connection-reason')).toContainText('unpairing waits');
+        await expect(page.locator('#connection-reason')).toContainText(
+          'revoking and unpairing wait until',
+        );
         // What the core last said stays, labelled by the notice.
         await expect(devices(page)).toHaveCount(2);
         // The settings are this device's own and still change.
@@ -282,4 +318,25 @@ test('on a core that does not serve the network, no devices pair', async ({ page
   await expect(facts.locator('dd').first()).toHaveText('Serving on this machine only');
   await expect(page.locator('main')).toContainText("leto doesn't serve the network");
   expect(api.requests.some((r) => r.path === '/api/v1/devices')).toBe(false);
+});
+
+// The core's page host answers only this machine, and gates it with the page cookie: a 401 there
+// means the cookie is missing, and pairing is beside the point. Chromium resolves *.localhost to
+// this machine by itself.
+test('signed out at nearhost.localhost, it points at the page address', async ({
+  page,
+  browserName,
+  baseURL,
+}) => {
+  test.skip(browserName !== 'chromium', 'only Chromium resolves *.localhost by itself');
+  await fakeApi(page, { signedOut: true });
+  const port = new URL(baseURL!).port;
+  await page.goto(`http://nearhost.localhost:${port}/machine`);
+  const main = page.locator('main');
+  await expect(main.getByRole('heading', { level: 1 })).toHaveText(
+    "Open Nearhost's page from this machine first",
+  );
+  await expect(main).toContainText('nearhost status');
+  await expect(main.getByRole('link', { name: 'Type the code' })).toHaveCount(0);
+  await expect(main).not.toContainText('Add to Home Screen');
 });

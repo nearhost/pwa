@@ -6,13 +6,16 @@
 
   let {
     label,
+    labelledby,
     options,
     value,
     onchange,
     fill = false,
   }: {
-    /** The group's accessible name. */
-    label: string;
+    /** The group's accessible name, when no visible label names it. */
+    label?: string;
+    /** The id of the visible label that names the group. */
+    labelledby?: string;
     options: readonly { id: T; label: string }[];
     value: T;
     onchange: (value: T) => void;
@@ -31,7 +34,13 @@
   }
 </script>
 
-<div class="segmented" class:fill role="radiogroup" aria-label={label}>
+<div
+  class="segmented"
+  class:fill
+  role="radiogroup"
+  aria-label={labelledby ? undefined : label}
+  aria-labelledby={labelledby}
+>
   {#each options as option, i (option.id)}
     <button
       type="button"

@@ -79,7 +79,7 @@
 <div class="machine">
   <h1>This machine</h1>
 
-  <ConnectionNotice waits="unpairing" />
+  <ConnectionNotice waits="revoking and unpairing" />
 
   <section aria-labelledby="machine-name">
     <h2 id="machine-name"><bdi>{machine === 'this machine' ? 'This machine' : machine}</bdi></h2>

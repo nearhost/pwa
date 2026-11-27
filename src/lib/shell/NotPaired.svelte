@@ -2,40 +2,58 @@
   // What every screen shows while this device isn't paired (the core answers 401): the canvas's
   // PhonePair guidance. In a browser tab, open the link `nearhost pair` prints, then add the app
   // to the Home Screen; in the installed app, type the code on the core's own pairing form at
-  // /pair, which is on this origin and outside the app.
+  // /pair, which is on this origin and outside the app. At the core's page host on this machine
+  // a 401 means the page cookie is missing, and the page address is the way in, not pairing.
+  import { onMount } from 'svelte';
   import { appState } from '#lib/state.svelte.js';
   import Icon from '#lib/ui/Icon.svelte';
+  import { onThisMachine } from './page-host.js';
 
   const machine = $derived(appState.session?.machine ?? '');
   const on = $derived(machine || 'the machine that runs Nearhost');
   // The shell's attribute, which watchDisplayMode keeps.
   const installed = document.documentElement.getAttribute('data-display-mode') === 'standalone';
+  const local = onThisMachine(location.hostname);
+
+  // Shown in place of the screen the device was on, as after unpairing it: the focus goes here.
+  let heading: HTMLHeadingElement | undefined = $state();
+  onMount(() => heading?.focus());
 </script>
 
 <div class="pair">
-  <h1>Pair this device{machine ? ` with ${machine}` : ''}</h1>
-  {#if installed}
+  {#if local}
+    <h1 tabindex="-1" bind:this={heading}>Open Nearhost's page from this machine first</h1>
     <p>
-      Type the code <code>nearhost pair</code> printed on <bdi>{on}</bdi>. It stays paired.
+      Run <code>nearhost status</code> here and open the page address it prints, or click the page
+      address in <code>nearhost</code>.
     </p>
   {:else}
-    <p>
-      Run <code>nearhost pair</code> on <bdi>{on}</bdi> and open the link it prints in this browser, or
-      type the code it prints. It stays paired.
-    </p>
-  {/if}
-  <!-- The core's pairing form: a page load, not one of the app's routes. -->
-  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- the core's page, outside the app -->
-  <a class="button" href="/pair" data-sveltekit-reload>Type the code</a>
+    <h1 tabindex="-1" bind:this={heading}>
+      Pair this device{machine ? ` with ${machine}` : ''}
+    </h1>
+    {#if installed}
+      <p>
+        Type the code <code>nearhost pair</code> printed on <bdi>{on}</bdi>. It stays paired.
+      </p>
+    {:else}
+      <p>
+        Run <code>nearhost pair</code> on <bdi>{on}</bdi> and open the link it prints in this browser,
+        or type the code it prints. It stays paired.
+      </p>
+    {/if}
+    <!-- The core's pairing form: a page load, not one of the app's routes. -->
+    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- the core's page, outside the app -->
+    <a class="button" href="/pair" data-sveltekit-reload>Type the code</a>
 
-  {#if !installed}
-    <div class="install">
-      <span class="icon"><Icon name="share" size={22} /></span>
-      <span>
-        After pairing, choose <strong>Add to Home Screen</strong> or <strong>Install app</strong>
-        from your browser's menu. Nearhost then opens on its own, without the browser's bars.
-      </span>
-    </div>
+    {#if !installed}
+      <div class="install">
+        <span class="icon"><Icon name="share" size={22} /></span>
+        <span>
+          After pairing, choose <strong>Add to Home Screen</strong> or <strong>Install app</strong>
+          from your browser's menu. Nearhost then opens on its own, without the browser's bars.
+        </span>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -50,6 +68,7 @@
 
   h1 {
     margin: 0;
+    outline: none;
     font-size: 32px;
     line-height: 1.1;
     letter-spacing: -0.02em;

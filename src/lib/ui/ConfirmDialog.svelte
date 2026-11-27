@@ -43,6 +43,14 @@
     }
   });
 
+  // The browser may close the dialog itself: Chrome lets a page cancel only one Escape in a row.
+  // Keep it open while the answer is on its way; otherwise take it as Cancel.
+  function closed() {
+    if (!open || !dialog) return;
+    if (busy) dialog.showModal();
+    else oncancel();
+  }
+
   function cancel(event: Event) {
     // Escape: the dialog closes only through open, and not while the answer is on its way.
     event.preventDefault();
@@ -55,6 +63,7 @@
   aria-labelledby="confirm-title"
   aria-describedby="confirm-body"
   oncancel={cancel}
+  onclose={closed}
 >
   <h2 id="confirm-title">{title}</h2>
   <div id="confirm-body" class="body">{@render children()}</div>
