@@ -42,6 +42,10 @@
     ],
     port: ['M4 12h11M11 8l4 4-4 4', 'M19 5v14'],
     share: ['M12 3v12M7 8l5-5 5 5', 'M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6'],
+    offline: [
+      'M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0',
+      'M12 19h.01M3 3l18 18',
+    ],
   } as const;
 
   // Shapes drawn filled rather than stroked.

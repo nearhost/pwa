@@ -10,7 +10,7 @@ import {
   state,
 } from '#lib/api/testing.js';
 import type { State } from '#lib/api/types.js';
-import { appState, followEnvelopes, signOut, startState } from './state.svelte.js';
+import { appState, followEnvelopes, retry, signOut, startState } from './state.svelte.js';
 
 async function settle() {
   for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -342,6 +342,50 @@ describe('startState', () => {
       .send('POST', '/v1/projects/{name}/recheck', undefined, { name: 'shop' })
       .catch(() => {});
     expect(appState.lastAnswered?.getTime()).toBe(Date.parse('2026-11-27T10:00:20Z'));
+  });
+
+  it('keeps when the connection was lost through tries, until it is live again', async () => {
+    const t = setup();
+    stops.push(t.stop);
+    expect(appState.lostSince).toBeUndefined();
+    await settle();
+    FakeEventSource.last.open();
+    expect(appState.lostSince).toBeUndefined();
+
+    t.fake.on('GET /api/v1/state', () => Promise.reject(new TypeError('Failed to fetch')));
+    vi.setSystemTime(new Date('2026-11-27T10:01:00Z'));
+    FakeEventSource.last.drop();
+    expect(appState.connection).toBe('lost');
+    expect(appState.lostSince?.getTime()).toBe(Date.parse('2026-11-27T10:01:00Z'));
+
+    // Try again says connecting, and lost again when it fails, from the first loss.
+    vi.setSystemTime(new Date('2026-11-27T10:01:05Z'));
+    retry();
+    expect(appState.connection).toBe('connecting');
+    await settle();
+    expect(appState.connection).toBe('lost');
+    expect(appState.lostSince?.getTime()).toBe(Date.parse('2026-11-27T10:01:00Z'));
+
+    t.fake.on('GET /api/v1/state', () => json(state(5)));
+    retry();
+    await settle();
+    FakeEventSource.last.open();
+    expect(appState.connection).toBe('live');
+    expect(appState.lostSince).toBeUndefined();
+  });
+
+  it('keeps no loss while connecting the first time, and one from the first failure', async () => {
+    const fake = fakeFetch();
+    fake.on('GET /api/v1/session', () => Promise.reject(new TypeError('Failed to fetch')));
+    fake.on('GET /api/v1/state', () => Promise.reject(new TypeError('Failed to fetch')));
+    const stop = startState(createClient({ fetch: fake.fetch }), { EventSource: FakeEventSource });
+    stops.push(stop);
+    expect(appState.connection).toBe('connecting');
+    expect(appState.lostSince).toBeUndefined();
+    await settle();
+    expect(appState.connection).toBe('lost');
+    expect(appState.lostSince?.getTime()).toBe(Date.parse('2026-11-27T10:00:00Z'));
+    expect(appState.lastAnswered).toBeUndefined();
   });
 
   it('stops following once stopped', async () => {

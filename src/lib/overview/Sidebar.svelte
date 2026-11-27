@@ -7,7 +7,17 @@
   import { appState } from '#lib/state.svelte.js';
   import { documentCount, groupByMachine, waitingCount } from './model.js';
 
-  const machine = $derived(appState.session?.machine || 'This machine');
+  let {
+    known,
+    dimmed = false,
+  }: {
+    /** The machine's name as this device last heard it, for while the session isn't read. */
+    known?: string;
+    /** Dimmed while the offline view stands in for the screen. */
+    dimmed?: boolean;
+  } = $props();
+
+  const machine = $derived(appState.session?.machine || known || 'This machine');
   const waiting = $derived(waitingCount(appState.state));
   const documents = $derived(documentCount(appState.state));
   const groups = $derived(appState.state ? groupByMachine(appState.state, machine) : []);
@@ -25,7 +35,7 @@
   const current = (href: string) => (path === href ? 'page' : undefined);
 </script>
 
-<div class="sidebar">
+<div class="sidebar" class:dimmed data-dimmed={dimmed || undefined}>
   <div class="machine">
     <span class="dot" data-link={appState.connection}></span>
     <span class="who">
@@ -95,6 +105,11 @@
     flex-direction: column;
     min-height: 100%;
     padding: 16px 16px 20px;
+    transition: opacity 150ms ease-out;
+  }
+
+  .dimmed {
+    opacity: 0.55;
   }
 
   .machine {

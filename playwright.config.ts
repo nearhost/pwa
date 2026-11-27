@@ -7,7 +7,13 @@ export default defineConfig({
   testDir: 'tests',
   workers: 2,
   forbidOnly: !!process.env.CI,
-  use: { baseURL: `http://localhost:${port}` },
+  use: {
+    baseURL: `http://localhost:${port}`,
+    // The fake core is route mocks, and Playwright's WebKit doesn't route the requests of a page a
+    // service worker controls, though the worker leaves them to the network. So the app's worker
+    // is kept out, except in tests/offline.spec.ts, which is about it.
+    serviceWorkers: 'block',
+  },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
