@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the app and commit it as a Go module release: scripts/release.sh X.Y.Z [--dry-run]
-# Run from a checkout of the build/vX.Y.Z tag. Makes a detached "release vX.Y.Z" commit that
+# Run from a checkout of the build/vX.Y.Z tag. Makes a "release vX.Y.Z" commit on a detached HEAD that
 # carries dist/ and version.go (on no branch), tags it vX.Y.Z and pushes only that tag (not with --dry-run).
 set -euo pipefail
 
@@ -40,14 +40,20 @@ EOF
 
 go test -p 4 -tags release .
 
-# Plumbing, not `git commit`: the pre-commit hook would run prettier and eslint over the build
-# output and change the files the hashed CSP were made from.
+# An ordinary commit: the pre-commit hook runs but leaves dist/ alone (dist/ is in .prettierignore
+# and eslint's ignores, so lint-staged leaves it alone), so the committed build is the built one.
+git switch --detach --quiet
 git add -f dist version.go
-tree="$(git write-tree)"
-export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-nearhost-ci}" GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-ci@nearhost.dev}"
-export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-$GIT_AUTHOR_NAME}" GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-$GIT_AUTHOR_EMAIL}"
-commit="$(git commit-tree "$tree" -p HEAD -m "release v$version")"
-git -c tag.gpgSign=false tag "v$version" "$commit"
+before="$(git write-tree)"
+git -c user.name="${GIT_AUTHOR_NAME:-nearhost-ci}" -c user.email="${GIT_AUTHOR_EMAIL:-ci@nearhost.dev}" \
+  commit --quiet -m "release v$version"
+after="$(git rev-parse HEAD^{tree})"
+if [ "$before" != "$after" ]; then
+  echo "the commit hooks changed dist/" >&2
+  exit 1
+fi
+git -c tag.gpgSign=false tag "v$version"
+commit="$(git rev-parse HEAD)"
 
 if $dry_run; then
   echo "dry run: would push tag v$version at commit $commit"

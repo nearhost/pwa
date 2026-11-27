@@ -62,7 +62,7 @@ This repository is also the Go module `github.com/nearhost/pwa`. `package pwa` h
 To release version X.Y.Z, push the tag `build/vX.Y.Z` on the commit to build (a person or Claude). The `release` workflow then:
 
 1. checks that commit out, runs `npm ci && npm run build`, writes `version.go` and runs `go test -tags release`,
-2. commits `dist/` and `version.go` as "release vX.Y.Z" on no branch (it is not on `main`),
+2. commits `dist/` and `version.go` as "release vX.Y.Z" on a detached HEAD (it is not on `main`),
 3. pushes only the tag `vX.Y.Z`, which is the Go module version, and
 4. creates the GitHub release `vX.Y.Z`.
 
