@@ -26,8 +26,11 @@ on:
         type: boolean
         default: true
 permissions: {}
+# One run per tag at a time, so a rerun waits for the run before it. Per tag, not one group for
+# all: GitHub keeps only the newest pending run of a group and cancels the others, so a release
+# waiting behind a beta could be dropped, leaving a published release with no module tag.
 concurrency:
-  group: release
+  group: release-${{ inputs.tag || github.event.release.tag_name }}
   cancel-in-progress: false
 jobs:
   release:
@@ -59,6 +62,9 @@ jobs:
             echo "::error::$TAG is a beta: $beta, but its release is a prerelease: $prerelease" >&2
             exit 1
           fi
+      # fetch-depth 0 fetches every tag and every branch as origin/*: release.sh finds a module
+      # tag an earlier run pushed, and checks the build is on origin/main (a release) or on
+      # release-please's branch (a beta).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ env.TAG }}
@@ -70,20 +76,28 @@ jobs:
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version-file: go.mod
+      # On a rerun after the module tag was pushed, release.sh says so and exits 0, so the notes
+      # step below still runs.
       - name: Build, test and tag
         run: |
           flag=""
           [ "$DRY_RUN" = "true" ] && flag="--dry-run"
           scripts/release.sh "${TAG#build/v}" $flag
       # The release keeps release-please's (or beta.yml's) notes and title; this adds the
-      # module version to fetch. Through a file, so the notes' quotes and backticks reach gh as
-      # they are. gh release edit leaves the prerelease flag alone.
+      # module version to fetch, once: a rerun finds the line there. Through a file, so the
+      # notes' quotes and backticks reach gh as they are. gh release edit leaves the
+      # prerelease flag alone.
       - name: Add the Go module to the release notes
         if: env.DRY_RUN != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${TAG#build/v}"
+          line=$(printf 'Go module: %sgo get github.com/nearhost/pwa@v%s%s' '`' "$version" '`')
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > "$RUNNER_TEMP/notes.md"
-          printf '\nGo module: %sgo get github.com/nearhost/pwa@v%s%s\n' '`' "$version" '`' >> "$RUNNER_TEMP/notes.md"
+          if grep -qxF -- "$line" "$RUNNER_TEMP/notes.md"; then
+            echo "The notes already have the Go module line"
+            exit 0
+          fi
+          printf '\n%s\n' "$line" >> "$RUNNER_TEMP/notes.md"
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"

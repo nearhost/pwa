@@ -61,7 +61,7 @@ This repository is also the Go module `github.com/nearhost/pwa`. `package pwa` h
 
 Releases and betas need no tags pushed by hand; [release-please](https://github.com/googleapis/release-please) makes them from the conventional commits on `main`:
 
-- **A release.** release-please keeps a release PR open on `main` that bumps `package.json` and `.release-please-manifest.json` and writes `CHANGELOG.md`. Merge it to release that version, X.Y.Z: release-please tags the merge commit `build/vX.Y.Z` and publishes its GitHub release.
+- **A release.** release-please keeps a release PR open on `main` that bumps `package.json`, `package-lock.json` and `.release-please-manifest.json` and writes `CHANGELOG.md`. Merge it to release that version, X.Y.Z: release-please tags the merge commit `build/vX.Y.Z` and publishes its GitHub release.
 - **A beta.** Every push to the release PR's branch (`release-please--branches--main--components--build`) publishes the next beta of its version, X.Y.Z-beta.N, as the GitHub prerelease `build/vX.Y.Z-beta.N` (the `beta` workflow). Running `beta` by hand on that branch publishes another.
 
 Each published release of a `build/v` tag starts the `release` workflow, which:
@@ -73,7 +73,7 @@ Each published release of a `build/v` tag starts the `release` workflow, which:
 
 A beta's module version, `vX.Y.Z-beta.N`, is a Go prerelease: `go get github.com/nearhost/pwa@latest` passes over it, so the core takes a beta only by naming it. The beta's GitHub release stays a prerelease.
 
-Run the `release` workflow by hand (Actions, release) with a `build/v` tag and `dry_run` on to build and test without pushing a tag; with `dry_run` off it releases a tag whose GitHub release exists, when the run the release started failed. Locally, `scripts/release.sh VERSION --dry-run` (X.Y.Z or X.Y.Z-beta.N) in a clean clone does the same, prints the commit and tag it would push, then deletes the tag and returns to where it started. Without `--dry-run` the script refuses unless `build/vVERSION` exists and HEAD is that tag's commit. `scripts/release_test.sh` checks these guards, and `.github/scripts/beta-version_test.sh` the beta numbering; CI runs both.
+Run the `release` workflow by hand (Actions, release) with a `build/v` tag and `dry_run` on to build and test without pushing a tag; with `dry_run` off it releases a tag whose GitHub release exists, when the run the release started failed. Locally, `scripts/release.sh VERSION --dry-run` (X.Y.Z or X.Y.Z-beta.N) in a clean clone does the same, prints the commit and tag it would push, then deletes the tag and returns to where it started. Without `--dry-run` the script refuses unless `build/vVERSION` exists, HEAD is that tag's commit, and that commit is on `origin/main` (a release) or on the release PR's branch (a beta), so a GitHub release made by hand on another commit publishes nothing. If `vVERSION` is already on the release commit built from that tag, as when a rerun follows a failed notes step, it says so and exits without building. `scripts/release_test.sh` checks these guards, and `.github/scripts/beta-version_test.sh` the beta numbering; CI runs both.
 
 ### One-time setup
 
