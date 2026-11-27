@@ -66,7 +66,7 @@ To release version X.Y.Z, push the tag `build/vX.Y.Z` on the commit to build (a 
 3. pushes only the tag `vX.Y.Z`, which is the Go module version, and
 4. creates the GitHub release `vX.Y.Z`.
 
-Run the workflow by hand (Actions, release) with `dry_run` on to build and test without pushing a tag. Locally, `scripts/release.sh X.Y.Z --dry-run` in a clean clone does the same and prints the commit and tag it would push.
+Run the workflow by hand (Actions, release) with `dry_run` on to build and test without pushing a tag. Locally, `scripts/release.sh X.Y.Z --dry-run` in a clean clone does the same, prints the commit and tag it would push, then deletes the tag and returns to where it started. Without `--dry-run` the script refuses unless `build/vX.Y.Z` exists and HEAD is that tag's commit. `scripts/release_test.sh` checks these guards.
 
 The core picks a release up with `go get github.com/nearhost/pwa@vX.Y.Z` and serves `pwa.FS()` when `pwa.Built()` is true.
 

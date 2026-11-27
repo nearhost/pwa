@@ -27,6 +27,9 @@ jobs:
       TAG: ${{ inputs.tag || github.ref_name }}
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
     steps:
+      - name: Check the tag
+        run: |
+          [[ "$TAG" =~ ^build/v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad tag: $TAG" >&2; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ inputs.tag || github.ref_name }}
@@ -37,10 +40,7 @@ jobs:
           cache: npm
       - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version: 1.27.x
-      - name: Check the tag
-        run: |
-          [[ "$TAG" =~ ^build/v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad tag: $TAG" >&2; exit 1; }
+          go-version-file: go.mod
       - name: Build, test and tag
         run: |
           flag=""

@@ -4,11 +4,16 @@
 # carries dist/ and version.go (on no branch), tags it vX.Y.Z and pushes only that tag (not with --dry-run).
 set -euo pipefail
 
+usage="usage: scripts/release.sh X.Y.Z [--dry-run]"
 version="${1:-}"
 dry_run=false
+if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$2" != "--dry-run" ]; }; then
+  echo "$usage" >&2
+  exit 2
+fi
 [ "${2:-}" = "--dry-run" ] && dry_run=true
 if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "usage: scripts/release.sh X.Y.Z [--dry-run]" >&2
+  echo "$usage" >&2
   exit 2
 fi
 
@@ -18,14 +23,26 @@ if [ -n "$(git status --porcelain)" ]; then
   echo "the working tree is not clean" >&2
   exit 1
 fi
-if git rev-parse -q --verify "refs/tags/build/v$version" >/dev/null &&
-  [ "$(git rev-parse HEAD)" != "$(git rev-parse "refs/tags/build/v$version^{commit}")" ]; then
-  echo "HEAD is not the commit of build/v$version" >&2
+# A real release comes only from a reviewed, tagged commit: the tag v$version is permanent
+# (the Go proxy caches it for good). A dry run may start anywhere.
+if git rev-parse -q --verify "refs/tags/build/v$version" >/dev/null; then
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse "refs/tags/build/v$version^{commit}")" ]; then
+    echo "HEAD is not the commit of build/v$version" >&2
+    exit 1
+  fi
+elif ! $dry_run; then
+  echo "a release requires the tag build/v$version on the commit to build (or use --dry-run)" >&2
   exit 1
 fi
 if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
   echo "tag v$version already exists" >&2
   exit 1
+fi
+
+if $dry_run; then
+  # Leave nothing behind: no v$version tag, and back on the starting branch or commit.
+  start="$(git symbolic-ref -q --short HEAD || git rev-parse HEAD)"
+  trap 'git checkout -q -f "$start"; git tag -d "v$version" >/dev/null 2>&1 || true' EXIT
 fi
 
 npm ci
@@ -38,7 +55,7 @@ package pwa
 const Version = "$version"
 EOF
 
-go test -p 4 -tags release .
+go test -p 4 -tags release ./...
 
 # An ordinary commit: the pre-commit hook runs but leaves dist/ alone (dist/ is in .prettierignore
 # and eslint's ignores, so lint-staged leaves it alone), so the committed build is the built one.
