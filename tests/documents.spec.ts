@@ -86,6 +86,25 @@ for (const size of sizes) {
         const themes = page.getByRole('radiogroup', { name: 'Document style' });
         await expect(themes.getByRole('radio')).toHaveText(['Paper', 'Match app', 'As written']);
         await expect(themes.getByRole('radio', { name: 'Paper' })).toBeChecked();
+
+        // One tab stop, the checked option; the arrow keys pick and focus the next, wrapping.
+        const paper = themes.getByRole('radio', { name: 'Paper' });
+        const match = themes.getByRole('radio', { name: 'Match app' });
+        const written = themes.getByRole('radio', { name: 'As written' });
+        await expect(paper).toHaveAttribute('tabindex', '0');
+        await expect(match).toHaveAttribute('tabindex', '-1');
+        await expect(written).toHaveAttribute('tabindex', '-1');
+        await paper.focus();
+        await page.keyboard.press('ArrowLeft');
+        await expect(written).toBeChecked();
+        await expect(written).toBeFocused();
+        await expect(written).toHaveAttribute('tabindex', '0');
+        await expect(frame).toHaveAttribute('src', '/d/T1/docs/plans/checkout.md');
+        await page.keyboard.press('ArrowDown');
+        await expect(paper).toBeChecked();
+        await page.keyboard.press('ArrowRight');
+        await expect(match).toBeChecked();
+        await expect(match).toBeFocused();
         await themes.getByRole('radio', { name: 'Match app' }).check();
         await expect(frame).toHaveAttribute(
           'src',

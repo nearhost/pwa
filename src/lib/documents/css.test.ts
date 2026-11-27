@@ -11,7 +11,10 @@ const rules: Rule[] = [];
 root.walkRules((rule) => {
   rules.push(rule);
 });
-const selectors = rules.flatMap((rule) => rule.selectors.map((s) => s.replace(/\s+/g, ' ')));
+// As written, with the line breaks Prettier puts in a long selector taken out.
+const selectors = rules.flatMap((rule) =>
+  rule.selectors.map((s) => s.replace(/\s+/g, ' ').replace(/\( /g, '(').replace(/ \)/g, ')')),
+);
 
 /** Every declaration of prop in rules whose selector mentions what. */
 function declared(prop: string, where: (selector: string) => boolean = () => true): string[] {
@@ -26,10 +29,20 @@ function declared(prop: string, where: (selector: string) => boolean = () => tru
 }
 
 describe('documents.css', () => {
-  it('scopes every rule to a themed document, at no added weight', () => {
+  it('puts every selector wholly inside one :where(), so it weighs nothing', () => {
     expect(rules.length).toBeGreaterThan(20);
     for (const selector of selectors) {
       expect(selector).toMatch(/^:where\(:root\[data-nh-theme(=|\])/);
+      // The :where( that opens the selector closes at its very end.
+      let depth = 0;
+      let closed = -1;
+      for (let i = 0; i < selector.length && closed < 0; i++) {
+        if (selector[i] === '(') depth++;
+        if (selector[i] === ')' && --depth === 0) closed = i;
+      }
+      expect(closed, selector).toBe(selector.length - 1);
+      // A pseudo-element can't go inside :where(), and outside it would add weight.
+      expect(selector).not.toContain('::');
     }
   });
 
@@ -64,7 +77,7 @@ describe('documents.css', () => {
     ];
     for (const w of wanted) {
       expect(
-        selectors.some((s) => s.replace(/^:where\([^)]*\)+\s*/, '').includes(w)),
+        selectors.some((s) => s.includes(w)),
         `a rule for ${w}`,
       ).toBe(true);
     }
@@ -78,6 +91,15 @@ describe('documents.css', () => {
         `.chroma .${c}`,
       ).toBe(true);
     }
+  });
+
+  it('marks a highlighter error as the core does, with a background', () => {
+    const err = rules.find((r) => r.selector.includes('.chroma .err'));
+    const props: string[] = [];
+    err?.walkDecls((d) => {
+      props.push(d.prop);
+    });
+    expect(props).toEqual(expect.arrayContaining(['background', 'color']));
   });
 
   it('outlines images, darker on paper and light, lighter on dark', () => {

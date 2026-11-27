@@ -18,7 +18,7 @@ npm run verify    # format, lint, type check, unit and end-to-end tests, then bu
 
 `npm run build` writes the single-page app to `dist/`, which the core embeds. The end-to-end tests run in Chromium and WebKit; install them once with `npx playwright install chromium webkit`.
 
-`static/documents.css` ends up at `dist/documents.css`, where the core reads it: it inlines the file into a document asked for at `/d/…?theme=paper` or `?theme=app`. Every rule is scoped under `:where(:root[data-nh-theme…])`, so an HTML document's own styles still win, and it loads nothing (a themed Markdown page's policy is `default-src 'none'`), so system fonts only and `data:` images only. `src/lib/documents/css.test.ts` holds those rules.
+`static/documents.css` ends up at `dist/documents.css`, where the core reads it: it inlines the file into a document asked for at `/d/…?theme=paper` or `?theme=app`. Every selector is wholly inside `:where(:root[data-nh-theme…] …)`, so it weighs nothing and an HTML document's own styles always win (within the file, a later rule wins over an earlier one), and it loads nothing (a themed Markdown page's policy is `default-src 'none'`), so system fonts only and `data:` images only. `src/lib/documents/css.test.ts` holds those rules.
 
 The app talks to the core only through `src/lib/api/`, with the types from [`@nearhost/api`](https://www.npmjs.com/package/@nearhost/api), pinned to the version of the core it is built for. `src/lib/api/types.ts` is the one file that imports them.
 

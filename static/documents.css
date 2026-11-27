@@ -5,8 +5,9 @@
  * document in <article>) and gives an HTML document a readable default.
  *
  * Rules every rule here follows:
- * - Each selector starts with :where(:root[data-nh-theme...]), which adds no weight, so an HTML
- *   document's own rules win over these at the same specificity (theirs come later).
+ * - Each selector is wholly inside :where(:root[data-nh-theme...] ...), so it weighs nothing and
+ *   any rule of an HTML document's own wins over it. Every rule here weighs the same, so where two
+ *   apply to one element, the later one wins: mind the order.
  * - Nothing loads: a themed Markdown page's policy is default-src 'none', so no fonts (system
  *   stacks only) and no image but data: ones.
  *
@@ -44,6 +45,8 @@
   --nh-doc-hl-inserted: #116329;
   --nh-doc-hl-inserted-bg: #dafbe1;
   --nh-doc-hl-error: #82071e;
+  --nh-doc-hl-error-text: #f6f8fa;
+  --nh-doc-hl-error-bg: #82071e;
   --nh-doc-hl-line: #dcdfd7;
   --nh-doc-hl-number-line: #6e756f;
 }
@@ -78,6 +81,8 @@
   --nh-doc-hl-inserted: #56d364;
   --nh-doc-hl-inserted-bg: #0f5323;
   --nh-doc-hl-error: #f85149;
+  --nh-doc-hl-error-text: #f85149;
+  --nh-doc-hl-error-bg: transparent;
   --nh-doc-hl-line: #2a312b;
   --nh-doc-hl-number-line: #818a82;
 }
@@ -115,6 +120,8 @@
   --nh-doc-hl-inserted: #116329;
   --nh-doc-hl-inserted-bg: #dafbe1;
   --nh-doc-hl-error: #82071e;
+  --nh-doc-hl-error-text: #f6f8fa;
+  --nh-doc-hl-error-bg: #82071e;
   --nh-doc-hl-line: #dde0d9;
   --nh-doc-hl-number-line: #626b63;
 }
@@ -149,6 +156,8 @@
     --nh-doc-hl-inserted: #116329;
     --nh-doc-hl-inserted-bg: #dafbe1;
     --nh-doc-hl-error: #82071e;
+    --nh-doc-hl-error-text: #f6f8fa;
+    --nh-doc-hl-error-bg: #82071e;
     --nh-doc-hl-line: #dde0d9;
     --nh-doc-hl-number-line: #626b63;
   }
@@ -166,13 +175,7 @@
   text-size-adjust: 100%;
 }
 
-:where(:root[data-nh-theme]) *,
-:where(:root[data-nh-theme]) *::before,
-:where(:root[data-nh-theme]) *::after {
-  box-sizing: border-box;
-}
-
-:where(:root[data-nh-theme]) body {
+:where(:root[data-nh-theme] body) {
   margin: 0;
   padding: 48px 72px 72px;
   background: var(--nh-doc-ground);
@@ -184,7 +187,71 @@
   -webkit-font-smoothing: antialiased;
 }
 
-:where(:root[data-nh-theme]) .home {
+:where(:root[data-nh-theme] article) {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+:where(:root[data-nh-theme] :is(h1, h2, h3, h4, h5, h6)) {
+  color: var(--nh-doc-text);
+  font-family: var(--nh-doc-sans);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+:where(:root[data-nh-theme] h1) {
+  margin: 0 0 20px;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+:where(:root[data-nh-theme] h2) {
+  margin: 32px 0 10px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+:where(:root[data-nh-theme] h3) {
+  margin: 28px 0 8px;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme] :is(h4, h5, h6)) {
+  margin: 24px 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme] :is(p, ul, ol, dl, blockquote, pre, table, details, figure)) {
+  margin: 0 0 18px;
+}
+
+:where(:root[data-nh-theme] article > :first-child) {
+  margin-top: 0;
+}
+
+:where(:root[data-nh-theme] a) {
+  color: var(--nh-doc-link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+:where(:root[data-nh-theme] a:hover) {
+  text-decoration-thickness: 2px;
+}
+
+:where(:root[data-nh-theme] a:focus-visible) {
+  outline: 2px solid var(--nh-doc-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* After the links: the home link is one, and every rule here weighs the same. */
+:where(:root[data-nh-theme] .home) {
   display: block;
   max-width: 42rem;
   margin: 0 auto 28px;
@@ -195,97 +262,35 @@
   text-decoration: none;
 }
 
-:where(:root[data-nh-theme]) .home:hover {
+:where(:root[data-nh-theme] .home:hover) {
   color: var(--nh-doc-link);
 }
 
-:where(:root[data-nh-theme]) article {
-  max-width: 42rem;
-  margin: 0 auto;
-}
-
-:where(:root[data-nh-theme]) article > :first-child {
-  margin-top: 0;
-}
-
-:where(:root[data-nh-theme]) :is(h1, h2, h3, h4, h5, h6) {
-  color: var(--nh-doc-text);
-  font-family: var(--nh-doc-sans);
-  line-height: 1.2;
-  text-wrap: balance;
-}
-
-:where(:root[data-nh-theme]) h1 {
-  margin: 0 0 20px;
-  font-size: 40px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-:where(:root[data-nh-theme]) h2 {
-  margin: 32px 0 10px;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-:where(:root[data-nh-theme]) h3 {
-  margin: 28px 0 8px;
-  font-size: 21px;
-  font-weight: 600;
-}
-
-:where(:root[data-nh-theme]) :is(h4, h5, h6) {
-  margin: 24px 0 6px;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-:where(:root[data-nh-theme]) :is(p, ul, ol, dl, blockquote, pre, table, details, figure) {
-  margin: 0 0 18px;
-}
-
-:where(:root[data-nh-theme]) a {
-  color: var(--nh-doc-link);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-}
-
-:where(:root[data-nh-theme]) a:hover {
-  text-decoration-thickness: 2px;
-}
-
-:where(:root[data-nh-theme]) a:focus-visible {
-  outline: 2px solid var(--nh-doc-accent);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-:where(:root[data-nh-theme]) :is(ul, ol) {
+:where(:root[data-nh-theme] :is(ul, ol)) {
   padding-left: 24px;
 }
 
-:where(:root[data-nh-theme]) li {
+:where(:root[data-nh-theme] li) {
   margin-bottom: 6px;
 }
 
-:where(:root[data-nh-theme]) li > :is(ul, ol) {
+:where(:root[data-nh-theme] li > :is(ul, ol)) {
   margin: 6px 0 0;
 }
 
 /* A task list: GitHub's checkboxes, drawn as the canvas's. */
-:where(:root[data-nh-theme]) :is(ul, ol):has(> li > input[type='checkbox']) {
+:where(:root[data-nh-theme] :is(ul, ol):has(> li > input[type='checkbox'])) {
   padding-left: 0;
 }
 
-:where(:root[data-nh-theme]) li:has(> input[type='checkbox']) {
+:where(:root[data-nh-theme] li:has(> input[type='checkbox'])) {
   list-style: none;
 }
 
-:where(:root[data-nh-theme]) li > input[type='checkbox'] {
+:where(:root[data-nh-theme] li > input[type='checkbox']) {
   appearance: none;
   -webkit-appearance: none;
+  box-sizing: border-box;
   width: 20px;
   height: 20px;
   margin: 0 10px 0 0;
@@ -295,30 +300,30 @@
   background: transparent;
 }
 
-:where(:root[data-nh-theme]) li > input[type='checkbox']:checked {
+:where(:root[data-nh-theme] li > input[type='checkbox']:checked) {
   border-color: var(--nh-doc-accent);
   background: var(--nh-doc-accent) var(--nh-doc-check) center / 14px no-repeat;
 }
 
-:where(:root[data-nh-theme]) blockquote {
+:where(:root[data-nh-theme] blockquote) {
   padding: 4px 0 4px 20px;
   border-left: 3px solid var(--nh-doc-rule);
   color: var(--nh-doc-muted);
   font-style: italic;
 }
 
-:where(:root[data-nh-theme]) blockquote > :last-child {
+:where(:root[data-nh-theme] blockquote > :last-child) {
   margin-bottom: 0;
 }
 
-:where(:root[data-nh-theme]) hr {
+:where(:root[data-nh-theme] hr) {
   height: 0;
   margin: 32px 0;
   border: 0;
   border-top: 1px solid var(--nh-doc-line);
 }
 
-:where(:root[data-nh-theme]) img {
+:where(:root[data-nh-theme] img) {
   max-width: 100%;
   height: auto;
   border-radius: 6px;
@@ -326,18 +331,18 @@
   outline-offset: -1px;
 }
 
-:where(:root[data-nh-theme]) :is(code, kbd, samp, pre) {
+:where(:root[data-nh-theme] :is(code, kbd, samp, pre)) {
   font-family: var(--nh-doc-mono);
 }
 
-:where(:root[data-nh-theme]) code {
+:where(:root[data-nh-theme] code) {
   padding: 2px 6px;
   border-radius: 6px;
   background: var(--nh-doc-code-bg);
   font-size: 0.84em;
 }
 
-:where(:root[data-nh-theme]) pre {
+:where(:root[data-nh-theme] pre) {
   padding: 16px 18px;
   border-radius: 10px;
   background: var(--nh-doc-code-bg);
@@ -347,66 +352,66 @@
   tab-size: 4;
 }
 
-:where(:root[data-nh-theme]) pre code {
+:where(:root[data-nh-theme] pre code) {
   padding: 0;
   border-radius: 0;
   background: none;
   font-size: inherit;
 }
 
-:where(:root[data-nh-theme]) pre:focus-visible {
+:where(:root[data-nh-theme] pre:focus-visible) {
   outline: 2px solid var(--nh-doc-accent);
   outline-offset: 2px;
 }
 
-:where(:root[data-nh-theme]) table {
+:where(:root[data-nh-theme] table) {
   width: 100%;
   border-collapse: collapse;
   font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
 
-:where(:root[data-nh-theme]) :is(th, td) {
+:where(:root[data-nh-theme] :is(th, td)) {
   padding: 10px 12px;
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
 }
 
-:where(:root[data-nh-theme]) :is(th, td):first-child {
+:where(:root[data-nh-theme] :is(th, td):first-child) {
   padding-left: 0;
 }
 
-:where(:root[data-nh-theme]) :is(th, td):last-child {
+:where(:root[data-nh-theme] :is(th, td):last-child) {
   padding-right: 0;
 }
 
-:where(:root[data-nh-theme]) th {
+:where(:root[data-nh-theme] th) {
   border-bottom: 2px solid var(--nh-doc-rule);
   font-weight: 600;
 }
 
-:where(:root[data-nh-theme]) td {
+:where(:root[data-nh-theme] td) {
   border-bottom: 1px solid var(--nh-doc-line);
 }
 
-:where(:root[data-nh-theme]) tbody tr:last-child td {
+:where(:root[data-nh-theme] tbody tr:last-child td) {
   border-bottom: 0;
 }
 
-:where(:root[data-nh-theme]) dt {
+:where(:root[data-nh-theme] dt) {
   font-weight: 600;
 }
 
-:where(:root[data-nh-theme]) dd {
+:where(:root[data-nh-theme] dd) {
   margin: 0 0 8px 24px;
 }
 
-:where(:root[data-nh-theme]) summary {
+:where(:root[data-nh-theme] summary) {
   cursor: pointer;
 }
 
-:where(:root[data-nh-theme]) mark {
+:where(:root[data-nh-theme] mark) {
   padding: 0 2px;
   border-radius: 3px;
   background: color-mix(in oklch, var(--nh-doc-accent) 30%, transparent);
@@ -414,15 +419,15 @@
 }
 
 /* Syntax highlighting: the classes chroma writes. */
-:where(:root[data-nh-theme]) .chroma {
+:where(:root[data-nh-theme] .chroma) {
   background: var(--nh-doc-code-bg);
 }
 
-:where(:root[data-nh-theme]) .chroma .line {
+:where(:root[data-nh-theme] .chroma .line) {
   display: flex;
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.lntd, .lntable) {
+:where(:root[data-nh-theme] .chroma :is(.lntd, .lntable)) {
   margin: 0;
   padding: 0;
   border: 0;
@@ -430,11 +435,11 @@
   vertical-align: top;
 }
 
-:where(:root[data-nh-theme]) .chroma .hl {
+:where(:root[data-nh-theme] .chroma .hl) {
   background: var(--nh-doc-hl-line);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.ln, .lnt) {
+:where(:root[data-nh-theme] .chroma :is(.ln, .lnt)) {
   margin-right: 0.4em;
   padding: 0 0.4em;
   color: var(--nh-doc-hl-number-line);
@@ -443,127 +448,130 @@
   -webkit-user-select: none;
 }
 
-:where(:root[data-nh-theme]) .chroma .lnlinks {
+:where(:root[data-nh-theme] .chroma .lnlinks) {
   color: inherit;
   text-decoration: none;
 }
 
-:where(:root[data-nh-theme]) .chroma .err {
-  color: var(--nh-doc-hl-error);
+:where(:root[data-nh-theme] .chroma .err) {
+  background: var(--nh-doc-hl-error-bg);
+  color: var(--nh-doc-hl-error-text);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.k, .kd, .kn, .kp, .kr, .kt) {
+:where(:root[data-nh-theme] .chroma :is(.k, .kd, .kn, .kp, .kr, .kt)) {
   color: var(--nh-doc-hl-keyword);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.kc, .no, .py, .ld, .gh, .gu) {
+:where(:root[data-nh-theme] .chroma :is(.kc, .no, .py, .ld, .gh, .gu)) {
   color: var(--nh-doc-hl-constant);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.nc, .ne) {
+:where(:root[data-nh-theme] .chroma :is(.nc, .ne)) {
   color: var(--nh-doc-hl-class);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.nf, .fm, .nd) {
+:where(:root[data-nh-theme] .chroma :is(.nf, .fm, .nd)) {
   color: var(--nh-doc-hl-function);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.nb, .bp, .ni) {
+:where(:root[data-nh-theme] .chroma :is(.nb, .bp, .ni)) {
   color: var(--nh-doc-hl-builtin);
 }
 
-:where(:root[data-nh-theme]) .chroma .nt {
+:where(:root[data-nh-theme] .chroma .nt) {
   color: var(--nh-doc-hl-tag);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.nv, .vc, .vg, .vi, .vm, .nl) {
+:where(:root[data-nh-theme] .chroma :is(.nv, .vc, .vg, .vi, .vm, .nl)) {
   color: var(--nh-doc-hl-variable);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.na, .nn, .nx, .p, .go, .w) {
+:where(:root[data-nh-theme] .chroma :is(.na, .nn, .nx, .p, .go, .w)) {
   color: inherit;
 }
 
-:where(:root[data-nh-theme])
-  .chroma
-  :is(.l, .s, .sa, .sb, .sc, .dl, .sd, .s2, .se, .sh, .si, .sx, .sr, .s1, .ss) {
+:where(
+  :root[data-nh-theme]
+    .chroma
+    :is(.l, .s, .sa, .sb, .sc, .dl, .sd, .s2, .se, .sh, .si, .sx, .sr, .s1, .ss)
+) {
   color: var(--nh-doc-hl-string);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.m, .mb, .mf, .mh, .mi, .il, .mo) {
+:where(:root[data-nh-theme] .chroma :is(.m, .mb, .mf, .mh, .mi, .il, .mo)) {
   color: var(--nh-doc-hl-number);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.o, .ow, .or) {
+:where(:root[data-nh-theme] .chroma :is(.o, .ow, .or)) {
   color: var(--nh-doc-hl-operator);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.c, .ch, .cm, .c1, .cs, .cp, .cpf, .gp) {
+:where(:root[data-nh-theme] .chroma :is(.c, .ch, .cm, .c1, .cs, .cp, .cpf, .gp)) {
   color: var(--nh-doc-hl-comment);
 }
 
-:where(:root[data-nh-theme]) .chroma .gd {
+:where(:root[data-nh-theme] .chroma .gd) {
   background: var(--nh-doc-hl-deleted-bg);
   color: var(--nh-doc-hl-deleted);
 }
 
-:where(:root[data-nh-theme]) .chroma .gi {
+:where(:root[data-nh-theme] .chroma .gi) {
   background: var(--nh-doc-hl-inserted-bg);
   color: var(--nh-doc-hl-inserted);
 }
 
-:where(:root[data-nh-theme]) .chroma :is(.gr, .gt) {
+:where(:root[data-nh-theme] .chroma :is(.gr, .gt)) {
   color: var(--nh-doc-hl-error);
 }
 
-:where(:root[data-nh-theme]) .chroma .ge {
+:where(:root[data-nh-theme] .chroma .ge) {
   font-style: italic;
 }
 
-:where(:root[data-nh-theme]) .chroma .gs {
+:where(:root[data-nh-theme] .chroma .gs) {
   font-weight: 600;
 }
 
-:where(:root[data-nh-theme]) .chroma .gl {
+:where(:root[data-nh-theme] .chroma .gl) {
   text-decoration: underline;
 }
 
 /* A narrow frame: a phone, or a document beside something else. */
 @media (max-width: 600px) {
-  :where(:root[data-nh-theme]) body {
+  :where(:root[data-nh-theme] body) {
     padding: 24px 22px 48px;
     font-size: 17px;
     line-height: 1.6;
   }
 
-  :where(:root[data-nh-theme]) .home {
+  :where(:root[data-nh-theme] .home) {
     margin-bottom: 20px;
   }
 
-  :where(:root[data-nh-theme]) h1 {
+  :where(:root[data-nh-theme] h1) {
     margin-bottom: 14px;
     font-size: 30px;
   }
 
-  :where(:root[data-nh-theme]) h2 {
+  :where(:root[data-nh-theme] h2) {
     margin: 26px 0 8px;
     font-size: 22px;
   }
 
-  :where(:root[data-nh-theme]) h3 {
+  :where(:root[data-nh-theme] h3) {
     font-size: 19px;
   }
 
-  :where(:root[data-nh-theme]) :is(p, ul, ol, dl, blockquote, pre, table, details, figure) {
+  :where(:root[data-nh-theme] :is(p, ul, ol, dl, blockquote, pre, table, details, figure)) {
     margin-bottom: 16px;
   }
 
-  :where(:root[data-nh-theme]) pre {
+  :where(:root[data-nh-theme] pre) {
     padding: 14px;
     font-size: 13px;
   }
 
-  :where(:root[data-nh-theme]) table {
+  :where(:root[data-nh-theme] table) {
     font-size: 15px;
   }
 }

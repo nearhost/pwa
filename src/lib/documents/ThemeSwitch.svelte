@@ -16,11 +16,25 @@
     onclose: () => void;
   } = $props();
 
+  const buttons: HTMLButtonElement[] = $state([]);
+
   function keydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
+    // Another overlay's Escape is its own.
+    if (event.key === 'Escape' && !event.defaultPrevented) {
       event.preventDefault();
       onclose();
     }
+  }
+
+  // A radio group is one tab stop, the checked option; the arrow keys pick the next one and move
+  // the focus to it, wrapping round.
+  function arrows(event: KeyboardEvent, index: number) {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = (index + step + themes.length) % themes.length;
+    onchange(themes[next].id);
+    buttons[next]?.focus();
   }
 </script>
 
@@ -30,12 +44,15 @@
 <div class="switch" id="document-style">
   <p>{about}, {value === 'written' ? 'as it was written' : 'restyled for reading'}</p>
   <div class="segmented" role="radiogroup" aria-label="Document style">
-    {#each themes as t (t.id)}
+    {#each themes as t, i (t.id)}
       <button
         type="button"
         role="radio"
         aria-checked={value === t.id}
+        tabindex={value === t.id ? 0 : -1}
+        bind:this={buttons[i]}
         onclick={() => onchange(t.id)}
+        onkeydown={(event) => arrows(event, i)}
       >
         {t.label}
       </button>
