@@ -77,6 +77,8 @@ export default defineConfig({
     }),
   ],
   server: { proxy: coreProxy() },
+  // vite preview takes server.proxy unless told otherwise; it must never add the page cookie.
+  preview: { proxy: {} },
   build: {
     // Fonts are always files: the CSP's font-src is 'self' only, so a data: URI would be refused.
     assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),

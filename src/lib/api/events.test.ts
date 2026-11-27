@@ -16,10 +16,16 @@ function setup(firstSeq = 5) {
   const statuses: Connection[] = [];
   const onReset = vi.fn();
   const controller = new AbortController();
+  const doc = Object.assign(new EventTarget(), {
+    visibilityState: 'visible' as DocumentVisibilityState,
+  });
+  const win = new EventTarget();
   openEvents({
     client,
     signal: controller.signal,
     EventSource: FakeEventSource,
+    document: doc,
+    window: win,
     onState: (s) => states.push(s),
     onEnvelope: (e) => envelopes.push(e),
     onReset,
@@ -32,8 +38,21 @@ function setup(firstSeq = 5) {
     statuses,
     onReset,
     controller,
+    doc,
+    win,
     setSeq: (n: number) => (seq = n),
   };
+}
+
+// A state read the test answers, or fails, when it chooses.
+function pending() {
+  let answer!: (r: Response) => void;
+  let refuse!: (e: unknown) => void;
+  const promise = new Promise<Response>((resolve, reject) => {
+    answer = resolve;
+    refuse = reject;
+  });
+  return { route: () => promise, answer, refuse };
 }
 
 // Lets the fake fetch's promises settle.
@@ -192,5 +211,129 @@ describe('openEvents', () => {
     await vi.advanceTimersByTimeAsync(60000);
     expect(FakeEventSource.instances.length).toBe(1);
     expect(t.fake.count(getState)).toBe(1);
+  });
+
+  describe('a refetch still running when the stream drops', () => {
+    async function dropDuringResync() {
+      const t = setup(5);
+      await settle();
+      FakeEventSource.last.open();
+      const stale = pending();
+      t.fake.on(getState, stale.route);
+      // A gap starts a refetch (A), which hangs; then the stream drops.
+      FakeEventSource.last.send(envelope(9));
+      await settle();
+      FakeEventSource.last.drop();
+      // The reconnect's read (B) answers with a newer state, and the new stream opens.
+      t.fake.on(getState, () => json(state(20)));
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      const healthy = FakeEventSource.last;
+      healthy.open();
+      return { t, stale, healthy };
+    }
+
+    it('lets the new stream apply its envelopes', async () => {
+      const { t, healthy } = await dropDuringResync();
+      expect(t.statuses.at(-1)).toBe('live');
+      healthy.send(envelope(21));
+      expect(t.envelopes.map((e) => e.seq)).toEqual([21]);
+    });
+
+    it('drops the stale state when it answers late', async () => {
+      const { t, stale, healthy } = await dropDuringResync();
+      stale.answer(json(state(10)));
+      await settle();
+      expect(t.states.map((s) => s.seq)).toEqual([5, 20]);
+      healthy.send(envelope(21));
+      expect(t.envelopes.map((e) => e.seq)).toEqual([21]);
+    });
+
+    it('does not close the new stream when it fails late', async () => {
+      const { t, stale, healthy } = await dropDuringResync();
+      const opened = FakeEventSource.instances.length;
+      stale.refuse(new TypeError('Failed to fetch'));
+      await settle();
+      expect(healthy.closed).toBe(false);
+      expect(t.statuses.at(-1)).toBe('live');
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(FakeEventSource.instances.length).toBe(opened);
+    });
+  });
+
+  describe('when the app comes back', () => {
+    it('reconnects at once when the page is shown again after being hidden', async () => {
+      const t = setup(5);
+      await settle();
+      const first = FakeEventSource.last;
+      first.open();
+      t.doc.visibilityState = 'hidden';
+      t.doc.dispatchEvent(new Event('visibilitychange'));
+      await settle();
+      expect(FakeEventSource.instances.length).toBe(1);
+      t.setSeq(30);
+      t.doc.visibilityState = 'visible';
+      t.doc.dispatchEvent(new Event('visibilitychange'));
+      await settle();
+      expect(first.closed).toBe(true);
+      expect(t.fake.count(getState)).toBe(2);
+      expect(FakeEventSource.last.url).toBe('/api/v1/events?after=30');
+      // An old stream's late messages are not applied.
+      first.send(envelope(31));
+      expect(t.envelopes).toEqual([]);
+    });
+
+    it('does not reconnect on a visibilitychange that was not from hidden', async () => {
+      const t = setup(5);
+      await settle();
+      FakeEventSource.last.open();
+      t.doc.dispatchEvent(new Event('visibilitychange'));
+      await settle();
+      expect(FakeEventSource.instances.length).toBe(1);
+      expect(t.fake.count(getState)).toBe(1);
+    });
+
+    it('reconnects at once when the network comes back, skipping the backoff', async () => {
+      const t = setup(5);
+      await settle();
+      FakeEventSource.last.open();
+      t.fake.on(getState, () => Promise.reject(new TypeError('Failed to fetch')));
+      FakeEventSource.last.drop();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      // The next try would wait 2 s; the network is back now.
+      t.fake.on(getState, () => json(state(12)));
+      t.win.dispatchEvent(new Event('online'));
+      await settle();
+      expect(t.fake.count(getState)).toBe(3);
+      expect(FakeEventSource.last.url).toBe('/api/v1/events?after=12');
+      FakeEventSource.last.open();
+      expect(t.statuses.at(-1)).toBe('live');
+      // The backoff's timer was cleared: no second read when it would have fired.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(t.fake.count(getState)).toBe(3);
+    });
+
+    it('stays stopped after signing out, and listens no more once aborted', async () => {
+      const t = setup(5);
+      await settle();
+      t.controller.abort();
+      t.win.dispatchEvent(new Event('online'));
+      await settle();
+      expect(t.fake.count(getState)).toBe(1);
+
+      const u = setup(5);
+      await settle();
+      u.fake.on(getState, () => problem(401, 'proxy.api-sign-in'));
+      FakeEventSource.last.drop();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(u.statuses.at(-1)).toBe('signed-out');
+      const reads = u.fake.count(getState);
+      u.win.dispatchEvent(new Event('online'));
+      await settle();
+      expect(u.fake.count(getState)).toBe(reads);
+    });
   });
 });
