@@ -1,6 +1,44 @@
+import { readFileSync } from 'node:fs';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
+import type { ProxyOptions } from 'vite';
 import { defineConfig } from 'vitest/config';
+
+// `npm run dev` against a running core (see the README): NEARHOST_CORE is the core's page, such as
+// https://nearhost.localhost:9444, and /api goes there. The gate takes a write only from the
+// page's own origin, so the proxy sends the core's. The page cookie is Secure and host-only, so a
+// browser on the dev server never has it; with NEARHOST_PAGE_SECRET_FILE (the core's page-secret
+// file) the proxy adds it. Development only: anyone who can reach the dev server is signed in.
+function coreProxy(): Record<string, ProxyOptions> | undefined {
+  const core = process.env.NEARHOST_CORE;
+  if (!core) return undefined;
+  const origin = new URL(core).origin;
+  const secretFile = process.env.NEARHOST_PAGE_SECRET_FILE;
+  const cookie = secretFile ? `__Host-nearhost=${readFileSync(secretFile, 'utf8').trim()}` : '';
+  return {
+    '/api': {
+      target: origin,
+      changeOrigin: true,
+      // The scratch core's certificate is from its own local CA, which Node does not trust.
+      secure: false,
+      configure(proxy) {
+        proxy.on('proxyReq', (req) => {
+          if (req.getHeader('origin')) req.setHeader('origin', origin);
+          if (cookie) req.setHeader('cookie', cookie);
+        });
+        // Node holds a response's headers until its first byte, so an idle event stream would
+        // not open for up to 15 s (the core's keep-alive). Send them as soon as they are written.
+        proxy.on('proxyRes', (proxyRes, _req, res) => {
+          if (proxyRes.headers['content-type']?.startsWith('text/event-stream')) {
+            setImmediate(() => {
+              if ('flushHeaders' in res && !res.headersSent) res.flushHeaders();
+            });
+          }
+        });
+      },
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
@@ -38,6 +76,7 @@ export default defineConfig({
       },
     }),
   ],
+  server: { proxy: coreProxy() },
   build: {
     // Fonts are always files: the CSP's font-src is 'self' only, so a data: URI would be refused.
     assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
