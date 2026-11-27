@@ -3,6 +3,7 @@
 // an init script puts a stand-in EventSource on the page, which the test drives from Node: open
 // the stream, send envelopes and heartbeats, drop it. Nothing is shared between tests, so they run
 // in parallel and in any browser. See the README's "End-to-end tests and the fake API".
+import { readFileSync } from 'node:fs';
 import type { Page, Request } from '@playwright/test';
 import { session as makeSession, state as makeState } from '../src/lib/api/testing.js';
 import type { Envelope, Session, State } from '../src/lib/api/types.js';
@@ -45,7 +46,16 @@ export interface FakeApi {
   drop(): Promise<void>;
   /** How many streams the app has opened. */
   streams(): Promise<number>;
+  /**
+   * The documents served below /d/, by path without the query, as the core serves them: a Markdown
+   * body in the core's page around it, or an HTML document as it is. See serveDocument.
+   */
+  documents: Record<string, FakeDocument>;
+  /** Every request below /d/, path and query, oldest first. */
+  documentRequests: string[];
 }
+
+export type FakeDocument = { markdown: string; title: string } | { html: string };
 
 declare global {
   interface Window {
@@ -98,6 +108,8 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
       await page.evaluate(() => window.__nearhostFakeEvents!.instances.at(-1)!.error());
     },
     streams: () => page.evaluate(() => window.__nearhostFakeEvents?.instances.length ?? 0),
+    documents: {},
+    documentRequests: [],
   };
   const session = makeSession(opts.session);
 
@@ -204,7 +216,71 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
     });
   });
 
+  await page.route(/^https?:\/\/localhost(:\d+)?\/d\//, (route) => {
+    const url = new URL(route.request().url());
+    api.documentRequests.push(url.pathname + url.search);
+    return route.fulfill(serveDocument(api.documents[url.pathname], url.searchParams));
+  });
+
   return api;
+}
+
+// The app's document stylesheet, which the core inlines into a themed document.
+const documentsCSS = readFileSync(new URL('../static/documents.css', import.meta.url), 'utf8');
+
+// The core's policies for documents (internal/documents/serve.go and theme.go).
+const csp = {
+  markdown:
+    "sandbox allow-popups; default-src 'none'; base-uri 'none'; style-src 'unsafe-inline'; img-src 'self' data: https:",
+  html: 'sandbox allow-scripts allow-popups allow-forms',
+  themedHTML: "sandbox allow-popups allow-forms; script-src 'none'",
+};
+
+/**
+ * Answers a /d/ request as the core does: ?theme=paper or app (with scheme=light or dark) marks
+ * <html> with data-nh-theme (and data-nh-scheme) and inlines documents.css first in <head>; any
+ * other theme is the document as written. A Markdown document is the core's page: the title, a
+ * home link and the body in <article>. A path not in documents is the core's 404.
+ */
+export function serveDocument(doc: FakeDocument | undefined, query: URLSearchParams) {
+  if (!doc) {
+    return {
+      status: 404,
+      contentType: 'text/html; charset=utf-8',
+      body: '<!doctype html><title>Not found</title><h1>This document isn’t served</h1>',
+    };
+  }
+  const name = query.get('theme');
+  const theme = name === 'paper' || name === 'app' ? name : undefined;
+  const scheme = query.get('scheme');
+  let attrs = '';
+  if (theme) {
+    attrs = ` data-nh-theme="${theme}"`;
+    if (scheme === 'light' || scheme === 'dark') attrs += ` data-nh-scheme="${scheme}"`;
+  }
+  const style = theme ? `<style>\n${documentsCSS}</style>\n` : '';
+  if ('markdown' in doc) {
+    return {
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      headers: { 'Content-Security-Policy': csp.markdown },
+      body:
+        `<!doctype html>\n<html lang="en"${attrs}>\n<head>\n<meta charset="utf-8">\n` +
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+        `<meta name="color-scheme" content="light dark">\n<title>${doc.title}</title>\n` +
+        `${style || '<style>body{font-family:serif}</style>\n'}</head>\n<body>\n` +
+        `<a class="home" href="/">Nearhost</a>\n<article>\n${doc.markdown}</article>\n</body>\n</html>\n`,
+    };
+  }
+  const body = theme
+    ? doc.html.replace(/<html([^>]*)>/i, `<html$1${attrs}>`).replace(/<head>/i, `<head>${style}`)
+    : doc.html;
+  return {
+    status: 200,
+    contentType: 'text/html; charset=utf-8',
+    headers: { 'Content-Security-Policy': theme ? csp.themedHTML : csp.html },
+    body,
+  };
 }
 
 function parseBody(request: Request): unknown {

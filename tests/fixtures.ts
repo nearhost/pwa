@@ -146,3 +146,94 @@ export const requests = {
     ],
   } satisfies Change as Change,
 };
+
+type Tree = NonNullable<State['documents']>[number];
+
+/**
+ * Served documents as the core's state lists them, newest first: Codex's HTML rate-limits spec on
+ * build-box, then Claude Code's checkout plan and ideas on this machine.
+ */
+export const trees: Tree[] = [
+  {
+    ID: 'T2',
+    Server: 'build-box',
+    Root: '/home/ecs/src/api',
+    Requester: 'codex',
+    RootHandle: '',
+    Docs: [{ Path: 'docs/rate-limits.html', Opened: '2026-11-27T11:20:00Z' }],
+    Opened: '2026-11-27T11:20:00Z',
+    Hidden: false,
+  },
+  {
+    ID: 'T1',
+    Server: 'local',
+    Root: '/Users/ecs/Code/storefront',
+    Requester: 'claude-code',
+    RootHandle: '/Users/ecs/Code/storefront',
+    Docs: [
+      { Path: 'docs/plans/checkout.md', Opened: '2026-11-27T10:51:00Z' },
+      { Path: 'docs/ideas.md', Opened: '2026-11-26T16:02:00Z' },
+    ],
+    Opened: '2026-11-26T16:02:00Z',
+    Hidden: false,
+  },
+];
+
+/** The body the core's Markdown renderer gives the checkout plan (goldmark with chroma classes). */
+export const checkoutPlan = `<h1 id="checkout-redesign">Checkout redesign</h1>
+<p>Move the shipping step ahead of payment, so the total a customer sees on the payment page is the total they pay. Today a <a href="https://storefront.lab.example.dev/cart">cart</a> over £50 shows free delivery until the address is in.</p>
+<h2 id="steps">Steps</h2>
+<ol>
+<li>Split <code>CheckoutController@store</code> into address and payment actions.</li>
+<li>Price delivery from the address, not the cart total.</li>
+<li>Keep the old route for a week behind a flag.</li>
+</ol>
+<blockquote>
+<p>Ask before changing the order email: support quotes it in replies.</p>
+</blockquote>
+<pre tabindex="0" class="chroma"><code class="language-php" data-lang="php"><span class="line"><span class="cl"><span class="c1">// The two new routes
+</span></span></span><span class="line"><span class="cl"><span class="nx">Route</span><span class="o">::</span><span class="na">post</span><span class="p">(</span><span class="s1">'/checkout/address'</span><span class="p">,</span> <span class="p">[</span><span class="nx">CheckoutController</span><span class="o">::</span><span class="na">class</span><span class="p">,</span> <span class="s1">'address'</span><span class="p">]);</span>
+</span></span><span class="line"><span class="cl"><span class="k">function</span> <span class="nf">total</span><span class="p">(</span><span class="kt">int</span> <span class="nv">$pence</span><span class="p">)</span><span class="o">:</span> <span class="kt">string</span> <span class="p">{</span> <span class="k">return</span> <span class="nb">number_format</span><span class="p">(</span><span class="nv">$pence</span> <span class="o">/</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">2</span><span class="p">);</span> <span class="p">}</span>
+</span></span></code></pre>
+<h2 id="delivery-prices">Delivery prices</h2>
+<table>
+<thead>
+<tr><th>Zone</th><th>Under £50</th><th>£50 and over</th></tr>
+</thead>
+<tbody>
+<tr><td>UK mainland</td><td>£4.50</td><td>Free</td></tr>
+<tr><td>Highlands and islands</td><td>£9.00</td><td>£4.50</td></tr>
+<tr><td>Europe</td><td>£14.00</td><td>£9.00</td></tr>
+</tbody>
+</table>
+<h3 id="the-new-page">The new page</h3>
+<p><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='200'%3E%3Crect width='480' height='200' fill='%23ffffff'/%3E%3Crect x='24' y='24' width='200' height='16' rx='4' fill='%23dde0d9'/%3E%3Crect x='24' y='56' width='432' height='120' rx='8' fill='%23f4f5f1'/%3E%3C/svg%3E" alt="A sketch of the address step"></p>
+<h2 id="checks">Checks</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> Feature tests for both actions</li>
+<li><input disabled="" type="checkbox"> Try it on a phone through Nearhost</li>
+</ul>
+<hr>
+<p>Inline <code>code</code>, <em>emphasis</em>, <strong>strong</strong> and a <a href="docs/ideas.md">link to the ideas</a>.</p>
+`;
+
+/**
+ * An HTML document whose script, if it ever ran, would say so: it changes the app's title and its
+ * own, marks its body and posts to the app.
+ */
+export const scriptedDocument = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Rate limiting spec</title></head>
+<body>
+<h1>Rate limiting for the API</h1>
+<p>Each API key gets a bucket of 120 requests a minute.</p>
+<p><a href="/d/T1/docs/ideas.md">The ideas</a> and <a href="https://example.com/" target="_blank">elsewhere</a>.</p>
+<script>
+  document.body.setAttribute('data-script-ran', '');
+  document.title = 'script ran';
+  try { parent.postMessage('script ran', '*'); } catch (e) {}
+  try { parent.document.title = 'script ran'; } catch (e) {}
+</script>
+</body>
+</html>
+`;

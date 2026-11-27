@@ -1,0 +1,569 @@
+/*
+ * The app's document styles. The core inlines this file first in the <head> of a document asked
+ * for with ?theme=paper or ?theme=app, and marks <html> with data-nh-theme (and data-nh-scheme
+ * when the app names one). It styles the page the core renders from Markdown (a.home, then the
+ * document in <article>) and gives an HTML document a readable default.
+ *
+ * Rules every rule here follows:
+ * - Each selector starts with :where(:root[data-nh-theme...]), which adds no weight, so an HTML
+ *   document's own rules win over these at the same specificity (theirs come later).
+ * - Nothing loads: a themed Markdown page's policy is default-src 'none', so no fonts (system
+ *   stacks only) and no image but data: ones.
+ *
+ * Paper is the canvas's light reading page, in either scheme. Match app is the app's colours: the
+ * scheme data-nh-scheme names, or the device's without it.
+ */
+
+/* Paper. */
+:where(:root[data-nh-theme='paper']) {
+  color-scheme: light;
+  --nh-doc-ground: #f4f5f1;
+  --nh-doc-text: #1b1f1c;
+  --nh-doc-muted: #5a615b;
+  --nh-doc-code-bg: #e6e8e1;
+  --nh-doc-rule: #b9bfb5;
+  --nh-doc-line: #dcdfd7;
+  --nh-doc-link: #4a6200;
+  --nh-doc-accent: #4a6200;
+  --nh-doc-image-outline: oklch(0 0 0 / 0.1);
+  --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  /* Syntax, after chroma's github style. */
+  --nh-doc-hl-keyword: #cf222e;
+  --nh-doc-hl-constant: #0550ae;
+  --nh-doc-hl-class: #1f2328;
+  --nh-doc-hl-function: #6639ba;
+  --nh-doc-hl-builtin: #6639ba;
+  --nh-doc-hl-tag: #0550ae;
+  --nh-doc-hl-variable: #953800;
+  --nh-doc-hl-string: #0a3069;
+  --nh-doc-hl-number: #0550ae;
+  --nh-doc-hl-operator: #0550ae;
+  --nh-doc-hl-comment: #57606a;
+  --nh-doc-hl-deleted: #82071e;
+  --nh-doc-hl-deleted-bg: #ffebe9;
+  --nh-doc-hl-inserted: #116329;
+  --nh-doc-hl-inserted-bg: #dafbe1;
+  --nh-doc-hl-error: #82071e;
+  --nh-doc-hl-line: #dcdfd7;
+  --nh-doc-hl-number-line: #6e756f;
+}
+
+/* Match app, dark: the default, and the scheme data-nh-scheme="dark" names. */
+:where(:root[data-nh-theme='app']) {
+  color-scheme: dark;
+  --nh-doc-ground: #0f1210;
+  --nh-doc-text: #ecefe8;
+  --nh-doc-muted: #a4ada5;
+  --nh-doc-code-bg: #1e231f;
+  --nh-doc-rule: #4a534b;
+  --nh-doc-line: #2a312b;
+  --nh-doc-link: #d6f26b;
+  --nh-doc-accent: #d6f26b;
+  --nh-doc-image-outline: oklch(1 0 0 / 0.1);
+  --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f1210' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  /* Syntax, after chroma's github-dark style. */
+  --nh-doc-hl-keyword: #ff7b72;
+  --nh-doc-hl-constant: #79c0ff;
+  --nh-doc-hl-class: #f0883e;
+  --nh-doc-hl-function: #d2a8ff;
+  --nh-doc-hl-builtin: #ffa657;
+  --nh-doc-hl-tag: #7ee787;
+  --nh-doc-hl-variable: #79c0ff;
+  --nh-doc-hl-string: #a5d6ff;
+  --nh-doc-hl-number: #a5d6ff;
+  --nh-doc-hl-operator: #ff7b72;
+  --nh-doc-hl-comment: #8b949e;
+  --nh-doc-hl-deleted: #ffa198;
+  --nh-doc-hl-deleted-bg: #490202;
+  --nh-doc-hl-inserted: #56d364;
+  --nh-doc-hl-inserted-bg: #0f5323;
+  --nh-doc-hl-error: #f85149;
+  --nh-doc-hl-line: #2a312b;
+  --nh-doc-hl-number-line: #818a82;
+}
+
+:where(:root[data-nh-theme='app'][data-nh-scheme='dark']) {
+  color-scheme: dark;
+}
+
+/* Match app, light: the scheme data-nh-scheme="light" names. Keep in step with the block below. */
+:where(:root[data-nh-theme='app'][data-nh-scheme='light']) {
+  color-scheme: light;
+  --nh-doc-ground: #f4f5f1;
+  --nh-doc-text: #1b1f1c;
+  --nh-doc-muted: #5c645d;
+  --nh-doc-code-bg: #e6e9e0;
+  --nh-doc-rule: #b9bfb5;
+  --nh-doc-line: #dde0d9;
+  --nh-doc-link: #4a6200;
+  --nh-doc-accent: #4a6200;
+  --nh-doc-image-outline: oklch(0 0 0 / 0.1);
+  --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  --nh-doc-hl-keyword: #cf222e;
+  --nh-doc-hl-constant: #0550ae;
+  --nh-doc-hl-class: #1f2328;
+  --nh-doc-hl-function: #6639ba;
+  --nh-doc-hl-builtin: #6639ba;
+  --nh-doc-hl-tag: #0550ae;
+  --nh-doc-hl-variable: #953800;
+  --nh-doc-hl-string: #0a3069;
+  --nh-doc-hl-number: #0550ae;
+  --nh-doc-hl-operator: #0550ae;
+  --nh-doc-hl-comment: #57606a;
+  --nh-doc-hl-deleted: #82071e;
+  --nh-doc-hl-deleted-bg: #ffebe9;
+  --nh-doc-hl-inserted: #116329;
+  --nh-doc-hl-inserted-bg: #dafbe1;
+  --nh-doc-hl-error: #82071e;
+  --nh-doc-hl-line: #dde0d9;
+  --nh-doc-hl-number-line: #626b63;
+}
+
+/* Match app with no scheme named: the device's. Keep in step with the block above. */
+@media (prefers-color-scheme: light) {
+  :where(:root[data-nh-theme='app']:not([data-nh-scheme])) {
+    color-scheme: light;
+    --nh-doc-ground: #f4f5f1;
+    --nh-doc-text: #1b1f1c;
+    --nh-doc-muted: #5c645d;
+    --nh-doc-code-bg: #e6e9e0;
+    --nh-doc-rule: #b9bfb5;
+    --nh-doc-line: #dde0d9;
+    --nh-doc-link: #4a6200;
+    --nh-doc-accent: #4a6200;
+    --nh-doc-image-outline: oklch(0 0 0 / 0.1);
+    --nh-doc-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+    --nh-doc-hl-keyword: #cf222e;
+    --nh-doc-hl-constant: #0550ae;
+    --nh-doc-hl-class: #1f2328;
+    --nh-doc-hl-function: #6639ba;
+    --nh-doc-hl-builtin: #6639ba;
+    --nh-doc-hl-tag: #0550ae;
+    --nh-doc-hl-variable: #953800;
+    --nh-doc-hl-string: #0a3069;
+    --nh-doc-hl-number: #0550ae;
+    --nh-doc-hl-operator: #0550ae;
+    --nh-doc-hl-comment: #57606a;
+    --nh-doc-hl-deleted: #82071e;
+    --nh-doc-hl-deleted-bg: #ffebe9;
+    --nh-doc-hl-inserted: #116329;
+    --nh-doc-hl-inserted-bg: #dafbe1;
+    --nh-doc-hl-error: #82071e;
+    --nh-doc-hl-line: #dde0d9;
+    --nh-doc-hl-number-line: #626b63;
+  }
+}
+
+/* The page. */
+:where(:root[data-nh-theme]) {
+  --nh-doc-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --nh-doc-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  background: var(--nh-doc-ground);
+  color: var(--nh-doc-text);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+:where(:root[data-nh-theme]) *,
+:where(:root[data-nh-theme]) *::before,
+:where(:root[data-nh-theme]) *::after {
+  box-sizing: border-box;
+}
+
+:where(:root[data-nh-theme]) body {
+  margin: 0;
+  padding: 48px 72px 72px;
+  background: var(--nh-doc-ground);
+  color: var(--nh-doc-text);
+  font-family: var(--nh-doc-sans);
+  font-size: 18px;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
+}
+
+:where(:root[data-nh-theme]) .home {
+  display: block;
+  max-width: 42rem;
+  margin: 0 auto 28px;
+  color: var(--nh-doc-muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+:where(:root[data-nh-theme]) .home:hover {
+  color: var(--nh-doc-link);
+}
+
+:where(:root[data-nh-theme]) article {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+:where(:root[data-nh-theme]) article > :first-child {
+  margin-top: 0;
+}
+
+:where(:root[data-nh-theme]) :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--nh-doc-text);
+  font-family: var(--nh-doc-sans);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+:where(:root[data-nh-theme]) h1 {
+  margin: 0 0 20px;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+:where(:root[data-nh-theme]) h2 {
+  margin: 32px 0 10px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+:where(:root[data-nh-theme]) h3 {
+  margin: 28px 0 8px;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme]) :is(h4, h5, h6) {
+  margin: 24px 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme]) :is(p, ul, ol, dl, blockquote, pre, table, details, figure) {
+  margin: 0 0 18px;
+}
+
+:where(:root[data-nh-theme]) a {
+  color: var(--nh-doc-link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+:where(:root[data-nh-theme]) a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:where(:root[data-nh-theme]) a:focus-visible {
+  outline: 2px solid var(--nh-doc-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+:where(:root[data-nh-theme]) :is(ul, ol) {
+  padding-left: 24px;
+}
+
+:where(:root[data-nh-theme]) li {
+  margin-bottom: 6px;
+}
+
+:where(:root[data-nh-theme]) li > :is(ul, ol) {
+  margin: 6px 0 0;
+}
+
+/* A task list: GitHub's checkboxes, drawn as the canvas's. */
+:where(:root[data-nh-theme]) :is(ul, ol):has(> li > input[type='checkbox']) {
+  padding-left: 0;
+}
+
+:where(:root[data-nh-theme]) li:has(> input[type='checkbox']) {
+  list-style: none;
+}
+
+:where(:root[data-nh-theme]) li > input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin: 0 10px 0 0;
+  vertical-align: -4px;
+  border: 2px solid var(--nh-doc-rule);
+  border-radius: 6px;
+  background: transparent;
+}
+
+:where(:root[data-nh-theme]) li > input[type='checkbox']:checked {
+  border-color: var(--nh-doc-accent);
+  background: var(--nh-doc-accent) var(--nh-doc-check) center / 14px no-repeat;
+}
+
+:where(:root[data-nh-theme]) blockquote {
+  padding: 4px 0 4px 20px;
+  border-left: 3px solid var(--nh-doc-rule);
+  color: var(--nh-doc-muted);
+  font-style: italic;
+}
+
+:where(:root[data-nh-theme]) blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+:where(:root[data-nh-theme]) hr {
+  height: 0;
+  margin: 32px 0;
+  border: 0;
+  border-top: 1px solid var(--nh-doc-line);
+}
+
+:where(:root[data-nh-theme]) img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  outline: 1px solid var(--nh-doc-image-outline);
+  outline-offset: -1px;
+}
+
+:where(:root[data-nh-theme]) :is(code, kbd, samp, pre) {
+  font-family: var(--nh-doc-mono);
+}
+
+:where(:root[data-nh-theme]) code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--nh-doc-code-bg);
+  font-size: 0.84em;
+}
+
+:where(:root[data-nh-theme]) pre {
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: var(--nh-doc-code-bg);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-x: auto;
+  tab-size: 4;
+}
+
+:where(:root[data-nh-theme]) pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+}
+
+:where(:root[data-nh-theme]) pre:focus-visible {
+  outline: 2px solid var(--nh-doc-accent);
+  outline-offset: 2px;
+}
+
+:where(:root[data-nh-theme]) table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+:where(:root[data-nh-theme]) :is(th, td) {
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+:where(:root[data-nh-theme]) :is(th, td):first-child {
+  padding-left: 0;
+}
+
+:where(:root[data-nh-theme]) :is(th, td):last-child {
+  padding-right: 0;
+}
+
+:where(:root[data-nh-theme]) th {
+  border-bottom: 2px solid var(--nh-doc-rule);
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme]) td {
+  border-bottom: 1px solid var(--nh-doc-line);
+}
+
+:where(:root[data-nh-theme]) tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+:where(:root[data-nh-theme]) dt {
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme]) dd {
+  margin: 0 0 8px 24px;
+}
+
+:where(:root[data-nh-theme]) summary {
+  cursor: pointer;
+}
+
+:where(:root[data-nh-theme]) mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: color-mix(in oklch, var(--nh-doc-accent) 30%, transparent);
+  color: inherit;
+}
+
+/* Syntax highlighting: the classes chroma writes. */
+:where(:root[data-nh-theme]) .chroma {
+  background: var(--nh-doc-code-bg);
+}
+
+:where(:root[data-nh-theme]) .chroma .line {
+  display: flex;
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.lntd, .lntable) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-spacing: 0;
+  vertical-align: top;
+}
+
+:where(:root[data-nh-theme]) .chroma .hl {
+  background: var(--nh-doc-hl-line);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.ln, .lnt) {
+  margin-right: 0.4em;
+  padding: 0 0.4em;
+  color: var(--nh-doc-hl-number-line);
+  white-space: pre;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+:where(:root[data-nh-theme]) .chroma .lnlinks {
+  color: inherit;
+  text-decoration: none;
+}
+
+:where(:root[data-nh-theme]) .chroma .err {
+  color: var(--nh-doc-hl-error);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.k, .kd, .kn, .kp, .kr, .kt) {
+  color: var(--nh-doc-hl-keyword);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.kc, .no, .py, .ld, .gh, .gu) {
+  color: var(--nh-doc-hl-constant);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.nc, .ne) {
+  color: var(--nh-doc-hl-class);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.nf, .fm, .nd) {
+  color: var(--nh-doc-hl-function);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.nb, .bp, .ni) {
+  color: var(--nh-doc-hl-builtin);
+}
+
+:where(:root[data-nh-theme]) .chroma .nt {
+  color: var(--nh-doc-hl-tag);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.nv, .vc, .vg, .vi, .vm, .nl) {
+  color: var(--nh-doc-hl-variable);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.na, .nn, .nx, .p, .go, .w) {
+  color: inherit;
+}
+
+:where(:root[data-nh-theme])
+  .chroma
+  :is(.l, .s, .sa, .sb, .sc, .dl, .sd, .s2, .se, .sh, .si, .sx, .sr, .s1, .ss) {
+  color: var(--nh-doc-hl-string);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.m, .mb, .mf, .mh, .mi, .il, .mo) {
+  color: var(--nh-doc-hl-number);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.o, .ow, .or) {
+  color: var(--nh-doc-hl-operator);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.c, .ch, .cm, .c1, .cs, .cp, .cpf, .gp) {
+  color: var(--nh-doc-hl-comment);
+}
+
+:where(:root[data-nh-theme]) .chroma .gd {
+  background: var(--nh-doc-hl-deleted-bg);
+  color: var(--nh-doc-hl-deleted);
+}
+
+:where(:root[data-nh-theme]) .chroma .gi {
+  background: var(--nh-doc-hl-inserted-bg);
+  color: var(--nh-doc-hl-inserted);
+}
+
+:where(:root[data-nh-theme]) .chroma :is(.gr, .gt) {
+  color: var(--nh-doc-hl-error);
+}
+
+:where(:root[data-nh-theme]) .chroma .ge {
+  font-style: italic;
+}
+
+:where(:root[data-nh-theme]) .chroma .gs {
+  font-weight: 600;
+}
+
+:where(:root[data-nh-theme]) .chroma .gl {
+  text-decoration: underline;
+}
+
+/* A narrow frame: a phone, or a document beside something else. */
+@media (max-width: 600px) {
+  :where(:root[data-nh-theme]) body {
+    padding: 24px 22px 48px;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  :where(:root[data-nh-theme]) .home {
+    margin-bottom: 20px;
+  }
+
+  :where(:root[data-nh-theme]) h1 {
+    margin-bottom: 14px;
+    font-size: 30px;
+  }
+
+  :where(:root[data-nh-theme]) h2 {
+    margin: 26px 0 8px;
+    font-size: 22px;
+  }
+
+  :where(:root[data-nh-theme]) h3 {
+    font-size: 19px;
+  }
+
+  :where(:root[data-nh-theme]) :is(p, ul, ol, dl, blockquote, pre, table, details, figure) {
+    margin-bottom: 16px;
+  }
+
+  :where(:root[data-nh-theme]) pre {
+    padding: 14px;
+    font-size: 13px;
+  }
+
+  :where(:root[data-nh-theme]) table {
+    font-size: 15px;
+  }
+}

@@ -27,7 +27,10 @@
     };
   });
 
-  const preview = $derived(page.route.id === '/projects/[name]');
+  // A preview and the reader fill the space below the header with their frame.
+  const fill = $derived(
+    page.route.id === '/projects/[name]' || page.route.id === '/documents/[...path]',
+  );
   const machine = $derived(appState.session?.machine || 'this machine');
   const line = $derived(
     {
@@ -39,10 +42,10 @@
   );
 </script>
 
-<!-- A preview fills the space below the header with its frame; every other page has the sections. -->
+<!-- A preview or a document fills the space below the header with its frame; every other page has the sections. -->
 {#snippet sidebar()}<Sidebar />{/snippet}
 {#snippet tabs()}<SectionTabs />{/snippet}
-<Shell fill={preview} sidebar={preview ? undefined : sidebar} tabs={preview ? undefined : tabs}>
+<Shell {fill} sidebar={fill ? undefined : sidebar} tabs={fill ? undefined : tabs}>
   {#snippet header()}
     <span class="machine-name" data-machine>{machine}</span>
     <span class="connection" data-connection={appState.connection} role="status">{line}</span>
