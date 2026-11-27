@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appName } from '$lib';
+import { appName } from '#lib';
 
 describe('appName', () => {
   it('is Nearhost', () => {

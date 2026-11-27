@@ -5,7 +5,6 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import svelte from 'eslint-plugin-svelte';
 import prettier from 'eslint-config-prettier';
-import svelteConfig from './svelte.config.js';
 
 export default defineConfig([
   {
@@ -27,7 +26,6 @@ export default defineConfig([
       parserOptions: {
         parser: tseslint.parser,
         extraFileExtensions: ['.svelte'],
-        svelteConfig,
       },
     },
   },
