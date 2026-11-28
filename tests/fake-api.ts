@@ -67,7 +67,8 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
   const handlers = new Map<string, Handler>();
   const requests: FakeRequest[] = [];
   const api: FakeApi = {
-    state: makeState(1, opts.state),
+    // A copy, so a test that changes its state never changes a fixture another test shares.
+    state: makeState(1, structuredClone(opts.state)),
     requests,
     on: (key, handler) => void handlers.set(key, handler),
     async open() {

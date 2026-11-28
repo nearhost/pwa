@@ -323,3 +323,40 @@ describe('startState', () => {
     expect(es.closed).toBe(true);
   });
 });
+
+describe('followers', () => {
+  it('one that throws stops neither the others, the state, nor the read it asks for', async () => {
+    const shop = { State: 'stopped', Message: '' } as NonNullable<State['projects']>[string];
+    const t = setup(state(5, { projects: { shop } }));
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const seen: number[] = [];
+    const stopBroken = followEnvelopes(() => {
+      throw new Error('a screen with a bug');
+    });
+    const stopGood = followEnvelopes((e) => seen.push(e.seq));
+    t.fake.on('GET /api/v1/state', () =>
+      json(state(7, { projects: { shop: { ...shop, State: 'running' } }, clients: 4 })),
+    );
+    const es = FakeEventSource.last;
+    es.send(
+      envelope(6, {
+        event: { Time: '', Project: 'shop', Server: '', State: 'starting', Message: '' },
+      }),
+    );
+    expect(appState.state?.projects?.shop?.State).toBe('starting');
+    es.send(envelope(7, { kind: 'config' }));
+    await settle();
+    stopBroken();
+    stopGood();
+    expect(seen).toEqual([6, 7]);
+    expect(logged).toHaveBeenCalledTimes(2);
+    logged.mockRestore();
+    // The config's read still happened, and the stream is still live.
+    expect(t.fake.count('GET /api/v1/state')).toBe(2);
+    expect(appState.state?.clients).toBe(4);
+    expect(appState.connection).toBe('live');
+  });
+});

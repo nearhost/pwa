@@ -72,3 +72,13 @@ h1 {
   letter-spacing: var(--nh-track-display);
   overflow-wrap: anywhere;
 }
+
+/* Text for assistive technology only. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -29,19 +29,29 @@ type Follower = (envelope: Envelope, info: EnvelopeInfo) => void;
 const followers = new Set<Follower>();
 
 /**
- * Calls follower with every envelope the stream carries, in order, once, after the state has taken
- * it in: log lines, opened passthroughs and shown documents included. Until the returned function
- * is called.
+ * Calls follower with each envelope the stream delivers, in order, once, after the state has taken
+ * it in: log lines, opened passthroughs and shown documents included. Resets are not delivered (the
+ * state read they lead to is the news). A follower that throws is logged and skipped, so one
+ * screen's bug neither stops the others nor the stream. Until the returned function is called.
  */
 export function followEnvelopes(follower: Follower): () => void {
   followers.add(follower);
   return () => void followers.delete(follower);
 }
 
+let current: Client | undefined;
+
+/** The client the running state talks to the core with; screens send their writes through it. */
+export function apiClient(): Client {
+  if (!current) throw new Error('the app state has not been started');
+  return current;
+}
+
 export function startState(
   client: Client,
   opts: { EventSource?: EventsOptions['EventSource'] } = {},
 ): () => void {
+  current = client;
   appState.connection = 'connecting';
   appState.state = undefined;
   appState.session = undefined;
@@ -85,7 +95,13 @@ export function startState(
       // One the state already includes changes nothing there; without a state, read it.
       let again = false;
       if (!info.inState) again = appState.state ? applyEnvelope(appState.state, envelope) : true;
-      for (const follower of followers) follower(envelope, info);
+      for (const follower of followers) {
+        try {
+          follower(envelope, info);
+        } catch (error) {
+          console.error('a follower of the event stream failed', error);
+        }
+      }
       return again;
     },
     onStatus(status) {
