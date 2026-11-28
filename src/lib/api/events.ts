@@ -55,7 +55,16 @@ export interface EventsOptions {
   window?: EventTarget;
 }
 
-export function openEvents(opts: EventsOptions): void {
+export interface Events {
+  /**
+   * Drops the stream, and any read or wait in progress, and connects again now, as Try again asks:
+   * it says connecting until the new stream opens (live) or the try fails (lost). Nothing once
+   * signed out or aborted.
+   */
+  retry(): void;
+}
+
+export function openEvents(opts: EventsOptions): Events {
   const { client, signal } = opts;
   const Source = opts.EventSource ?? globalThis.EventSource;
   let seq = 0;
@@ -229,15 +238,18 @@ export function openEvents(opts: EventsOptions): void {
     timer = setTimeout(() => void connect(), wait);
   }
 
-  // Drops the stream, and any read or wait in progress, and connects again now.
-  function reconnect() {
+  // Drops the stream, and any read or wait in progress, and connects again now. Asked by the user,
+  // it says connecting at once.
+  function reconnect(asked = false) {
     if (stopped || signal.aborted) return;
     clearTimeout(timer);
     close();
     attempt = 0;
-    // The stream that looked live may be half-open: unless the new one opens within the grace,
-    // say so. Live comes back only from the new stream's onopen.
-    if (shown === 'live') {
+    if (asked) {
+      status('connecting');
+    } else if (shown === 'live') {
+      // The stream that looked live may be half-open: unless the new one opens within the grace,
+      // say so. Live comes back only from the new stream's onopen.
       clearTimeout(grace);
       grace = setTimeout(() => status('connecting'), wakeGrace);
     }
@@ -257,16 +269,18 @@ export function openEvents(opts: EventsOptions): void {
     }
   };
   doc?.addEventListener('visibilitychange', onVisibility);
-  win?.addEventListener('online', reconnect);
+  const onOnline = () => reconnect();
+  win?.addEventListener('online', onOnline);
 
   signal.addEventListener('abort', () => {
     clearTimeout(timer);
     clearTimeout(grace);
     close();
     doc?.removeEventListener('visibilitychange', onVisibility);
-    win?.removeEventListener('online', reconnect);
+    win?.removeEventListener('online', onOnline);
   });
 
   status('connecting');
   void connect();
+  return { retry: () => reconnect(true) };
 }

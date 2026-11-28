@@ -12,6 +12,11 @@ export interface AppState {
   session?: Session;
   /** When the core last answered anything successfully. */
   lastAnswered?: Date;
+  /**
+   * When the connection was lost, kept through the tries after it (connecting, lost again) until
+   * it is live again; undefined while it hasn't been lost since it was last live.
+   */
+  lostSince?: Date;
 }
 
 export const appState: AppState = $state({ connection: 'connecting' });
@@ -42,6 +47,13 @@ export function followEnvelopes(follower: Follower): () => void {
 let current: Client | undefined;
 // Ends the running state's stream and reads, leaving what it has.
 let endState: (() => void) | undefined;
+// Tries the running state's connection again now.
+let retryState: (() => void) | undefined;
+
+/** Connects again now, without waiting for the next try: the offline view's Try again. */
+export function retry() {
+  retryState?.();
+}
 
 /**
  * Says this device is signed out, as after it was unpaired, and stops following the core: every
@@ -67,6 +79,7 @@ export function startState(
   appState.state = undefined;
   appState.session = undefined;
   appState.lastAnswered = undefined;
+  appState.lostSince = undefined;
 
   const controller = new AbortController();
   const { signal } = controller;
@@ -96,7 +109,7 @@ export function startState(
     );
   void readSession();
 
-  openEvents({
+  const events = openEvents({
     client,
     signal,
     EventSource: opts.EventSource,
@@ -120,14 +133,21 @@ export function startState(
     },
     onStatus(status) {
       if (status === 'live') answered();
+      if (status === 'live' || status === 'signed-out') appState.lostSince = undefined;
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced, never changed in place
+      else if (status === 'lost' && !appState.lostSince) appState.lostSince = new Date();
       appState.connection = status;
     },
   });
+  retryState = events.retry;
 
   return () => {
     controller.abort();
     stopObserving();
-    if (current === client) endState = undefined;
+    if (current === client) {
+      endState = undefined;
+      retryState = undefined;
+    }
   };
 }
 

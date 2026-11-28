@@ -22,7 +22,7 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
     visibilityState: 'visible' as DocumentVisibilityState,
   });
   const win = new EventTarget();
-  openEvents({
+  const events = openEvents({
     client,
     signal: controller.signal,
     EventSource: FakeEventSource,
@@ -50,6 +50,7 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
     controller,
     doc,
     win,
+    events,
     setSeq: (n: number) => (seq = n),
   };
 }
@@ -329,6 +330,61 @@ describe('openEvents', () => {
       // The backoff's timer was cleared: no second read when it would have fired.
       await vi.advanceTimersByTimeAsync(2000);
       expect(t.fake.count(getState)).toBe(3);
+    });
+
+    it('tries again at once when asked, says connecting meanwhile and lost if it fails', async () => {
+      const t = setup(5);
+      await settle();
+      FakeEventSource.last.open();
+      t.fake.on(getState, () => Promise.reject(new TypeError('Failed to fetch')));
+      FakeEventSource.last.drop();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(t.fake.count(getState)).toBe(2);
+      expect(t.statuses.at(-1)).toBe('lost');
+      // Asked to: no wait for the backoff's 2 s, and it says so at once.
+      const hang = pending();
+      t.fake.on(getState, hang.route);
+      t.events.retry();
+      expect(t.statuses.at(-1)).toBe('connecting');
+      await settle();
+      expect(t.fake.count(getState)).toBe(3);
+      hang.refuse(new TypeError('Failed to fetch'));
+      await settle();
+      expect(t.statuses.at(-1)).toBe('lost');
+      // And again, now the core answers.
+      t.fake.on(getState, () => json(state(12)));
+      t.events.retry();
+      await settle();
+      expect(FakeEventSource.last.url).toBe('/api/v1/events?after=12');
+      FakeEventSource.last.open();
+      expect(t.statuses.at(-1)).toBe('live');
+      // The backoff's timer was cleared: no other read when it would have fired.
+      const reads = t.fake.count(getState);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(t.fake.count(getState)).toBe(reads);
+    });
+
+    it('does nothing when asked to try again once signed out or aborted', async () => {
+      const t = setup(5);
+      await settle();
+      t.controller.abort();
+      t.events.retry();
+      await settle();
+      expect(t.fake.count(getState)).toBe(1);
+
+      const u = setup(5);
+      await settle();
+      u.fake.on(getState, () => problem(401, 'proxy.api-sign-in'));
+      FakeEventSource.last.drop();
+      await vi.advanceTimersByTimeAsync(1000);
+      await settle();
+      expect(u.statuses.at(-1)).toBe('signed-out');
+      const reads = u.fake.count(getState);
+      u.events.retry();
+      await settle();
+      expect(u.fake.count(getState)).toBe(reads);
+      expect(u.statuses.at(-1)).toBe('signed-out');
     });
 
     it('stays stopped after signing out, and listens no more once aborted', async () => {

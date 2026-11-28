@@ -12,7 +12,8 @@ func TestReleaseCarriesTheBuild(t *testing.T) {
 	if !Built() {
 		t.Fatal("Built() is false in a release")
 	}
-	for _, name := range []string{"index.html", "manifest.webmanifest"} {
+	// service-worker.js keeps the shell for offline use; the core serves it from the page host.
+	for _, name := range []string{"index.html", "manifest.webmanifest", "service-worker.js"} {
 		if _, err := fs.Stat(FS(), name); err != nil {
 			t.Errorf("FS() lacks %s: %v", name, err)
 		}

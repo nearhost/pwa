@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, outsideTheApp, test, type Page } from './test.js';
 import { envelope, fakeApi, type FakeApi } from './fake-api.js';
 import { checkoutPlan, scriptedDocument, trees } from './fixtures.js';
 import { schemes, sizes } from './sizes.js';
@@ -184,6 +184,7 @@ test.describe('the reader', () => {
   test('the fixture’s script runs where scripts are allowed, so the test above means something', async ({
     page,
   }) => {
+    outsideTheApp('the document itself, which the worker never serves');
     await withDocuments(page);
     await page.goto('/d/T2/docs/rate-limits.html');
     await expect(page.locator('body')).toHaveAttribute('data-script-ran', '');
