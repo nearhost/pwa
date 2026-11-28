@@ -33,6 +33,13 @@
     ],
     check: ['m5 12 5 5 9-10'],
     down: ['m7 10 5 5 5-5'],
+    code: ['m8 9-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12'],
+    server: [
+      'M5 4h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+      'M5 13h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2z',
+      'M7 7.5h.01M7 16.5h.01',
+    ],
+    port: ['M4 12h11M11 8l4 4-4 4', 'M19 5v14'],
   } as const;
 
   // Shapes drawn filled rather than stroked.

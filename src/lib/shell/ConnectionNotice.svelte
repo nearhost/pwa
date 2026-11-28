@@ -4,11 +4,15 @@
   import { connectionReason } from '#lib/connection.js';
   import { appState } from '#lib/state.svelte.js';
 
+  /** What waits for the connection, in lower case, such as "answering". */
+  let { waits }: { waits?: string } = $props();
+
   const reason = $derived(
     connectionReason(
       appState.connection,
       appState.session?.machine || 'this machine',
       appState.lastAnswered,
+      waits,
     ),
   );
 </script>

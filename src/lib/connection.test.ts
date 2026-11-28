@@ -31,4 +31,13 @@ describe('connectionReason', () => {
       "This device isn't paired with leto, so nothing here can be changed.",
     );
   });
+
+  it('names the action that waits, when a screen gives one', () => {
+    expect(connectionReason('connecting', 'leto', undefined, 'answering')).toBe(
+      'Connecting to leto. Answering waits until it answers.',
+    );
+    expect(connectionReason('lost', 'leto', undefined, 'answering')).toBe(
+      "Can't reach leto. Answering waits until it's back.",
+    );
+  });
 });

@@ -8,16 +8,19 @@ export function connectionReason(
   connection: Connection,
   machine: string,
   lastAnswered: Date | undefined,
+  /** What waits for the connection, in lower case: "starting and stopping" unless said. */
+  waits = 'starting and stopping',
 ): string | undefined {
+  const Waits = waits.charAt(0).toUpperCase() + waits.slice(1);
   switch (connection) {
     case 'live':
       return undefined;
     case 'connecting':
-      return `Connecting to ${machine}. Starting and stopping waits until it answers.`;
+      return `Connecting to ${machine}. ${Waits} waits until it answers.`;
     case 'lost':
       return lastAnswered
-        ? `Can't reach ${machine}. This is what it said at ${time.format(lastAnswered)}; starting and stopping waits until it's back.`
-        : `Can't reach ${machine}. Starting and stopping waits until it's back.`;
+        ? `Can't reach ${machine}. This is what it said at ${time.format(lastAnswered)}; ${waits} waits until it's back.`
+        : `Can't reach ${machine}. ${Waits} waits until it's back.`;
     case 'signed-out':
       return `This device isn't paired with ${machine}, so nothing here can be changed.`;
   }

@@ -1,7 +1,10 @@
 <script lang="ts">
-  // The core, the skill and agents hand out links to /change/<project>; this page must always load.
+  // A project's change request. The core, the skill and agents hand out links to /change/<project>,
+  // so this page always loads: on a change that is gone it says it is no longer waiting.
   import { page } from '$app/state';
+  import ChangeRequest from '#lib/approvals/ChangeRequest.svelte';
+
+  const name = $derived(page.params.name ?? '');
 </script>
 
-<h1>Change to {page.params.name}</h1>
-<p>The change this project's .nearhostrc asks for will appear here.</p>
+{#key name}<ChangeRequest {name} />{/key}

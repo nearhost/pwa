@@ -1,5 +1,5 @@
 // The overview's view of the state: projects grouped by the machine they run on, the addresses
-// they open at, and what waits for the user.
+// they open at, and how much waits for the user (#lib/approvals says what).
 import type { State } from '#lib/api/types.js';
 import type { OpenProjectsIn } from '#lib/settings.js';
 
@@ -125,40 +125,11 @@ export function hostOf(address: string | undefined): string {
   }
 }
 
-export interface WaitingItem {
-  key: string;
-  text: string;
-  href: string;
-}
-
-/** What waits for the user: agents' requests, oldest first, then projects' changes. */
-export function waitingItems(state: State | undefined): WaitingItem[] {
-  if (!state) return [];
-  const items: WaitingItem[] = [];
-  for (const a of state.approvals ?? []) {
-    const href = `/approve/${encodeURIComponent(a.id)}`;
-    let text = 'A request waits for your answer';
-    if (a.proposal) text = `An agent wants to add ${a.proposal.Name}`;
-    else if (a.pass) text = `${a.pass.Requester} asks to open port ${a.pass.Remote}`;
-    else if (a.doc) text = `${a.doc.Requester} asks to show documents`;
-    items.push({ key: a.id, text, href });
-  }
-  const changed = Object.entries(state.projects ?? {})
-    .filter(([, p]) => p.Pending)
-    .map(([name]) => name)
-    .sort();
-  for (const name of changed) {
-    items.push({
-      key: `change ${name}`,
-      text: `${name} asks for a change`,
-      href: `/change/${encodeURIComponent(name)}`,
-    });
-  }
-  return items;
-}
-
+/** How many things wait for the user: agents' requests and projects' changes. */
 export function waitingCount(state: State | undefined): number {
-  return waitingItems(state).length;
+  if (!state) return 0;
+  const changes = Object.values(state.projects ?? {}).filter((p) => p.Pending).length;
+  return (state.approvals?.length ?? 0) + changes;
 }
 
 /** The documents in the folders that are shown. */

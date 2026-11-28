@@ -9,7 +9,6 @@ import {
   previewLink,
   stateLabel,
   waitingCount,
-  waitingItems,
 } from './model.js';
 
 type Project = NonNullable<State['projects']>[string];
@@ -191,23 +190,6 @@ describe('labels and counts', () => {
     });
     expect(waitingCount(s)).toBe(3);
     expect(waitingCount(undefined)).toBe(0);
-  });
-
-  it('lists what waits, each with where it is answered', () => {
-    const s = state(1, {
-      approvals: [
-        { id: 'a1', proposal: { Name: 'billing', Origin: 'leto' } },
-        { id: 'a2', pass: { Requester: 'claude-code', Remote: 5173 } },
-        { id: 'a3', doc: { Requester: 'codex', Root: '~/Code/x' } },
-      ] as State['approvals'],
-      projects: { shop: project('running', { Pending: { SHA256: 'x' } as Project['Pending'] }) },
-    });
-    expect(waitingItems(s)).toEqual([
-      { key: 'a1', text: 'An agent wants to add billing', href: '/approve/a1' },
-      { key: 'a2', text: 'claude-code asks to open port 5173', href: '/approve/a2' },
-      { key: 'a3', text: 'codex asks to show documents', href: '/approve/a3' },
-      { key: 'change shop', text: 'shop asks for a change', href: '/change/shop' },
-    ]);
   });
 
   it('counts the documents of the folders that are shown', () => {
