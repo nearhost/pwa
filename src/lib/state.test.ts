@@ -99,7 +99,7 @@ describe('startState', () => {
 
   it("applies a project's state change fully: state, message and problem", async () => {
     const shop = {
-      State: 'running',
+      State: 'stopped',
       Message: '',
       Problem: null,
     } as unknown as NonNullable<State['projects']>[string];
@@ -135,12 +135,12 @@ describe('startState', () => {
           Time: '',
           Project: 'shop',
           Server: '',
-          State: 'running',
-          Message: 'state: running',
+          State: 'stopped',
+          Message: 'state: stopped',
         },
       }),
     );
-    expect(appState.state?.projects?.shop?.State).toBe('running');
+    expect(appState.state?.projects?.shop?.State).toBe('stopped');
     expect(appState.state?.projects?.shop?.Message).toBe('');
     expect(appState.state?.projects?.shop?.Problem).toBeNull();
     expect(t.fake.count('GET /api/v1/state')).toBe(1);
@@ -246,19 +246,81 @@ describe('startState', () => {
       expect(t.fake.count('GET /api/v1/state')).toBe(2);
     });
 
-    it('not on a project log line or a known project state change', async () => {
-      const shop = { State: 'starting', Message: '' } as NonNullable<State['projects']>[string];
+    it('not on a project log line, or a state change that serves nothing new', async () => {
+      const shop = { State: 'stopped', Message: '' } as NonNullable<State['projects']>[string];
       const t = await live(state(5, { projects: { shop } }));
+      const change = (seq: number, to: string) =>
+        envelope(seq, {
+          event: { Time: '', Project: 'shop', Server: '', State: to as never, Message: '' },
+        });
       FakeEventSource.last.send(
         envelope(6, { event: { Time: '', Project: 'shop', Server: '', State: '', Message: 'x' } }),
       );
-      FakeEventSource.last.send(
-        envelope(7, {
-          event: { Time: '', Project: 'shop', Server: '', State: 'running', Message: '' },
-        }),
-      );
+      // Neither stopped nor in error does the proxy serve it: nothing it serves has changed.
+      FakeEventSource.last.send(change(7, 'error'));
+      FakeEventSource.last.send(change(8, 'stopped'));
       await settle();
       expect(t.fake.count('GET /api/v1/state')).toBe(1);
+      expect(appState.state?.projects?.shop?.State).toBe('stopped');
+    });
+
+    // The core gives a project's network address only while the proxy serves it, so one that
+    // starts or stops is read again for its routes; its new state shows at once all the same.
+    for (const [from, to] of [
+      ['stopped', 'starting'],
+      ['starting', 'running'],
+      ['stopped', 'running'],
+      ['running', 'stopped'],
+      ['running', 'error'],
+      ['running', 'degraded'],
+    ] as const) {
+      it(`on a project going from ${from} to ${to}, applying it at once`, async () => {
+        const shop = { State: from, Message: '' } as NonNullable<State['projects']>[string];
+        const t = await live(state(5, { projects: { shop } }));
+        const route = { host: 'shop.test', port: 80, url: 'https://shop.test' };
+        const site = (networkUrl?: string) => ({ routes: [{ ...route, networkUrl }] });
+        let answer!: (r: Response) => void;
+        t.fake.on('GET /api/v1/state', () => new Promise<Response>((r) => (answer = r)));
+        FakeEventSource.last.send(
+          envelope(6, {
+            event: { Time: '', Project: 'shop', Server: '', State: to, Message: '' },
+          }),
+        );
+        expect(appState.state?.projects?.shop?.State).toBe(to);
+        await settle();
+        expect(t.fake.count('GET /api/v1/state')).toBe(2);
+        answer(
+          json(
+            state(6, {
+              projects: { shop: { ...shop, State: to } },
+              sites: { shop: site(to === 'running' ? 'https://shop.lab.example.dev' : undefined) },
+            }),
+          ),
+        );
+        await settle();
+        expect(appState.state?.sites?.shop?.routes?.[0]?.networkUrl).toBe(
+          to === 'running' ? 'https://shop.lab.example.dev' : undefined,
+        );
+      });
+    }
+
+    it('once for a project that starts and runs in a burst', async () => {
+      const shop = { State: 'stopped', Message: '' } as NonNullable<State['projects']>[string];
+      const t = await live(state(5, { projects: { shop } }));
+      let answer!: (r: Response) => void;
+      t.fake.on('GET /api/v1/state', () => new Promise<Response>((r) => (answer = r)));
+      const change = (seq: number, to: 'starting' | 'running') =>
+        envelope(seq, {
+          event: { Time: '', Project: 'shop', Server: '', State: to, Message: '' },
+        });
+      FakeEventSource.last.send(change(6, 'starting'));
+      FakeEventSource.last.send(change(7, 'running'));
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
+      answer(json(state(7, { projects: { shop: { ...shop, State: 'running' } } })));
+      await settle();
+      expect(t.fake.count('GET /api/v1/state')).toBe(2);
+      expect(appState.state?.projects?.shop?.State).toBe('running');
     });
   });
 
@@ -342,6 +404,33 @@ describe('startState', () => {
       .send('POST', '/v1/projects/{name}/recheck', undefined, { name: 'shop' })
       .catch(() => {});
     expect(appState.lastAnswered?.getTime()).toBe(Date.parse('2026-11-27T10:00:20Z'));
+  });
+
+  it('reads the session again, as well as the state, after a config is applied', async () => {
+    const t = setup(state(5));
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    expect(appState.session?.networked).toBe(true);
+    // The core stopped serving the network, and its name changed with the new config.
+    t.fake.on('GET /api/v1/session', () => json(session({ networked: false, machine: 'kronos' })));
+    t.fake.on('GET /api/v1/state', () => json(state(6, { clients: 2 })));
+    FakeEventSource.last.send(envelope(6, { kind: 'config' }));
+    await settle();
+    expect(t.fake.count('GET /api/v1/session')).toBe(2);
+    expect(appState.session?.networked).toBe(false);
+    expect(appState.session?.machine).toBe('kronos');
+    expect(appState.state?.clients).toBe(2);
+  });
+
+  it('counts a heartbeat as an answer', async () => {
+    const t = setup();
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    vi.setSystemTime(new Date('2026-11-27T10:00:15Z'));
+    FakeEventSource.last.heartbeat();
+    expect(appState.lastAnswered?.getTime()).toBe(Date.parse('2026-11-27T10:00:15Z'));
   });
 
   it('keeps when the connection was lost through tries, until it is live again', async () => {

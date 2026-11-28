@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handling, shellPath, staleCache } from './requests.js';
+import { handling, replacesOldPage, shellPath, staleCache } from './requests.js';
 
 const origin = 'https://nearhost.lab.example.dev';
 const precached = new Set([
@@ -131,5 +131,24 @@ describe('staleCache', () => {
   it('leaves caches that are not the app’s alone', () => {
     expect(staleCache('something-else', current)).toBe(false);
     expect(staleCache('nearhost-other', current)).toBe(false);
+  });
+});
+
+describe('replacesOldPage', () => {
+  it('is true when the worker being replaced is the old page’s /sw.js', () => {
+    expect(replacesOldPage('https://nearhost.lab.example.dev/sw.js')).toBe(true);
+    expect(replacesOldPage('https://nearhost.localhost/sw.js?v=0.16.0')).toBe(true);
+  });
+
+  it('is false for an earlier build of the app, which keeps waiting', () => {
+    expect(replacesOldPage('https://nearhost.lab.example.dev/service-worker.js')).toBe(false);
+    expect(replacesOldPage('https://nearhost.lab.example.dev/app/sw.js.map')).toBe(false);
+    expect(replacesOldPage('https://nearhost.lab.example.dev/not-sw.js')).toBe(false);
+  });
+
+  it('is false when no worker is active, or the address is not one', () => {
+    expect(replacesOldPage(undefined)).toBe(false);
+    expect(replacesOldPage('')).toBe(false);
+    expect(replacesOldPage('not a url')).toBe(false);
   });
 });

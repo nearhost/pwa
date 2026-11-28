@@ -7,11 +7,12 @@
   import ConnectionNotice from '#lib/shell/ConnectionNotice.svelte';
   import Icon from '#lib/ui/Icon.svelte';
   import StartStop from '#lib/ui/StartStop.svelte';
-  import { addressOf, stateLabel } from '#lib/overview/model.js';
+  import { addressOf, stateLabel, unservedReason } from '#lib/overview/model.js';
   import { actionError } from '#lib/overview/actions.svelte.js';
   import { projectLogs } from '#lib/preview/logs.svelte.js';
   import { frameWidths, isCrossSite, type FrameWidth } from '#lib/preview/model.js';
   import PreviewFrame from '#lib/preview/PreviewFrame.svelte';
+  import ProjectLog from '#lib/preview/ProjectLog.svelte';
   import RouteTabs from '#lib/preview/RouteTabs.svelte';
   import StartingPanel from '#lib/preview/StartingPanel.svelte';
   import WidthControl from '#lib/preview/WidthControl.svelte';
@@ -37,7 +38,9 @@
 
   const route = $derived(routes[Math.min(selected, routes.length - 1)]);
   const address = $derived(addressOf(route, networked));
-  const crossSite = $derived(address ? isCrossSite(address, page.url.hostname) : false);
+  // On a networked core, why this route can't be opened from here (no network address).
+  const unserved = $derived(status && unservedReason(route, networked, status.State));
+  const crossSite = $derived(address ? isCrossSite(address, page.url.hostname, networked) : false);
   const framed = $derived(status?.State === 'running' || status?.State === 'degraded');
   const error = $derived(status ? actionError(name, status.State) : undefined);
 </script>
@@ -65,9 +68,17 @@
         <a class="open" href={address} target="_blank" rel="noopener">
           <Icon name="external" size={18} stroke={2} />Open in browser
         </a>
+      {:else if unserved}
+        <button type="button" class="open" disabled aria-describedby="unserved">
+          <Icon name="external" size={18} stroke={2} />Open in browser
+        </button>
       {/if}
     </div>
-    {#if address}
+    {#if unserved}
+      <div class="address">
+        <span class="reason" id="unserved">{unserved}</span>
+      </div>
+    {:else if address}
       <div class="address">
         <span class="lock"><Icon name="lock" size={14} stroke={2} /></span>
         <span class="url">{address}</span>
@@ -98,6 +109,18 @@
           <StartStop {name} state={status.State} running={false} {live} label />
         </span>
         {#if error}<p class="error" role="alert">{error}</p>{/if}
+      </div>
+    {:else if unserved}
+      <!-- Running, but this route has no address on the network: say so, and keep the log. -->
+      <div class="unserved">
+        <div class="said">
+          <h2>{name} isn't on the network yet</h2>
+          <p>
+            {where} hasn't put this route on the network, so it can't be shown here. It opens here once
+            it has.
+          </p>
+        </div>
+        <ProjectLog lines={projectLogs.lines(name)} />
       </div>
     {:else if !address}
       <div class="panel"><p>{name} has no web route to show.</p></div>
@@ -219,6 +242,20 @@
     outline-offset: 2px;
   }
 
+  .open:disabled {
+    border: 0;
+    background: var(--nh-raised);
+    color: var(--nh-muted);
+    font: inherit;
+    font-weight: 600;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .reason {
+    color: var(--nh-body);
+  }
+
   .address {
     display: flex;
     align-items: center;
@@ -283,6 +320,39 @@
 
   .panel .error {
     color: var(--pwa-failed);
+  }
+
+  .unserved {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 720px;
+    min-height: 0;
+    margin: 0 auto;
+    padding-top: 12px;
+  }
+
+  .said {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .said h2 {
+    margin: 0;
+    color: var(--nh-text);
+    font-family: var(--nh-font-display);
+    font-size: 22px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .said p {
+    margin: 0;
+    color: var(--nh-body);
+    line-height: 1.5;
   }
 
   .start {
@@ -396,7 +466,8 @@
       box-shadow: none;
     }
 
-    .stage > :global(.starting) {
+    .stage > :global(.starting),
+    .stage > .unserved {
       padding: 12px 20px 16px;
     }
   }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, outsideTheApp, test, type Page } from './test.js';
-import { fakeApi } from './fake-api.js';
+import { envelope, fakeApi } from './fake-api.js';
+import { session } from '../src/lib/api/testing.js';
 import { canvas } from './fixtures.js';
 import { schemes, sizes } from './sizes.js';
 
@@ -318,6 +319,21 @@ test('on a core that does not serve the network, no devices pair', async ({ page
   await expect(facts.locator('dd').first()).toHaveText('Serving on this machine only');
   await expect(page.locator('main')).toContainText("leto doesn't serve the network");
   expect(api.requests.some((r) => r.path === '/api/v1/devices')).toBe(false);
+});
+
+test('a config that stops serving the network shows at once, the new name too', async ({
+  page,
+}) => {
+  const api = await fakeApi(page);
+  await page.goto('/machine');
+  await expect(page.locator('[data-connection]')).toHaveText('Live');
+  await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible();
+  // The core applies a config that turns networked mode off and names the machine kronos.
+  api.on('GET /api/v1/session', () => ({
+    body: session({ networked: false, device: '', machine: 'kronos' }),
+  }));
+  await api.send(envelope(2, { kind: 'config' }));
+  await expect(page.locator('main')).toContainText("kronos doesn't serve the network");
 });
 
 // The core's page host answers only this machine, and gates it with the page cookie: a 401 there

@@ -6,7 +6,14 @@
   import StateDot from '#lib/ui/StateDot.svelte';
   import { alwaysBrowser, openProjectsIn } from '#lib/settings.js';
   import { actionError } from './actions.svelte.js';
-  import { addressOf, hostOf, previewLink, stateLabel, type ProjectView } from './model.js';
+  import {
+    addressOf,
+    hostOf,
+    previewLink,
+    stateLabel,
+    unservedReason,
+    type ProjectView,
+  } from './model.js';
 
   let { project, networked, live }: { project: ProjectView; networked: boolean; live: boolean } =
     $props();
@@ -14,6 +21,8 @@
   const id = $derived(`project-${project.name}`);
   const state = $derived(project.status.State);
   const address = $derived(addressOf(project.primary, networked));
+  // On a networked core, why the primary route can't be opened from here (no network address).
+  const unserved = $derived(unservedReason(project.primary, networked, state));
   const link = $derived(
     previewLink(project.name, address, {
       openIn: openProjectsIn(),
@@ -38,7 +47,11 @@
   <span class="dot"><StateDot {state} /></span>
   <div class="title">
     <h3 {id}>{project.name}</h3>
-    {#if address}<div class="host">{hostOf(address)}</div>{/if}
+    {#if address}
+      <div class="host">{hostOf(address)}</div>
+    {:else if unserved && running}
+      <div class="host unserved" id={`${id}-unserved`}>{unserved}</div>
+    {/if}
     <div class="detail" data-state={state}>{detail}</div>
   </div>
   <span class="pill" data-state={state}>
@@ -56,6 +69,8 @@
   {/if}
   <div class="actions">
     {#if running}
+      <!-- Without an address on the network the preview still opens in the app: its starting log,
+           or why there is no frame. -->
       <a
         class="preview"
         href={link.href}
@@ -75,6 +90,17 @@
         >
           <Icon name="external" size={18} stroke={2} />
         </a>
+      {:else if unserved}
+        <!-- Not on the network: nothing to open in the browser, said rather than a dead link. -->
+        <button
+          type="button"
+          class="icon-button"
+          disabled
+          aria-label={`Open ${project.name} in the browser`}
+          aria-describedby={`${id}-unserved`}
+        >
+          <Icon name="external" size={18} stroke={2} />
+        </button>
       {/if}
     {/if}
     <StartStop name={project.name} {state} {running} {live} label={!running} />
@@ -136,6 +162,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .host.unserved {
+    font-family: inherit;
   }
 
   .detail {
@@ -235,6 +265,14 @@
 
   .icon-button:hover {
     background: var(--nh-raised);
+  }
+
+  .icon-button:disabled {
+    background: var(--nh-raised);
+    color: var(--nh-muted);
+    border: 0;
+    cursor: not-allowed;
+    transform: none;
   }
 
   .preview:active,

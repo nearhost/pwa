@@ -9,16 +9,23 @@
 // failing them), is the cached index.html served.
 //
 // Updates: each build is a new worker (its file list and version are in it) with its own cache,
-// nearhost-app-<version>. It does not skip waiting: a page that is open keeps the worker, and the
-// cache, it loaded with, so its own route chunks still load from that cache offline after the core
-// was updated. The new worker takes over once no page uses the old one (the app closed and opened
+// nearhost-app-<version>. Over an earlier build's worker it does not skip waiting: a page that is
+// open keeps the worker, and the cache, it loaded with, so its own route chunks still load from
+// that cache offline after the core was updated. The new worker takes over once no page uses the old one (the app closed and opened
 // again), and only then deletes the old caches, the old page's nearhost-shell-* among them. Its
 // first install claims the open page, which no worker controlled, so that page's chunks are served
-// offline too.
+// offline too. Over the old page's worker (the core's /sw.js), which has no chunks to protect, it
+// skips waiting and takes over at once, so a device that had the old page moves to the app's.
 import { self } from '$app/service-worker';
 import { assets, immutable } from '$app/manifest';
 import { version } from '$app/env';
-import { cachePrefix, handling, shellPath, staleCache } from '#lib/offline/requests.js';
+import {
+  cachePrefix,
+  handling,
+  replacesOldPage,
+  shellPath,
+  staleCache,
+} from '#lib/offline/requests.js';
 
 const cacheName = cachePrefix + version;
 const navigationTimeout = 4000;
@@ -31,6 +38,8 @@ const precached = new Set(
 );
 
 self.addEventListener('install', (event) => {
+  // The old page's worker has no chunks of an open page to keep: take over from it at once.
+  if (replacesOldPage(self.registration.active?.scriptURL)) void self.skipWaiting();
   event.waitUntil(
     (async () => {
       const cache = await caches.open(cacheName);

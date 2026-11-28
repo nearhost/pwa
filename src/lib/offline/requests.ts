@@ -64,3 +64,17 @@ export function staleCache(name: string, current: string): boolean {
   if (name === current) return false;
   return name.startsWith(cachePrefix) || name.startsWith(oldPagePrefix);
 }
+
+/**
+ * Whether the worker a new one replaces, by its script's address, is the old page's (the core's
+ * /sw.js). The old page loads no chunks for a worker to keep, so the new one takes over at once
+ * rather than wait for every tab of it to close; an earlier build of the app's keeps its page.
+ */
+export function replacesOldPage(activeScriptURL: string | undefined): boolean {
+  if (!activeScriptURL) return false;
+  try {
+    return new URL(activeScriptURL).pathname.endsWith('/sw.js');
+  } catch {
+    return false;
+  }
+}

@@ -74,8 +74,8 @@ export default defineConfig({
           'img-src': ['self', 'data:'],
           'font-src': ['self'],
           'connect-src': ['self'],
-          // The preview's frame shows the projects' own sites, which are only ever https. The core's
-          // header names the projects' hosts; the build can't know them. The reader's frame shows
+          // The preview's frame shows the projects' own sites, which are only ever https, at hosts
+          // the build can't know; the core's header sends https: too. The reader's frame shows
           // documents from the page's own origin, at /d/.
           'frame-src': ['self', 'https:'],
           'manifest-src': ['self'],
