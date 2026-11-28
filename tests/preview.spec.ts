@@ -190,6 +190,90 @@ for (const size of sizes) {
         );
       });
 
+      test('a project started on a networked core opens at its network address', async ({
+        page,
+      }) => {
+        // The core gives admin's network address only once it runs: the app reads it again then.
+        const api = await fakeApi(page, { state: canvas, networkWhileRunning: true });
+        api.on('POST /api/v1/projects/admin/start', () => ({ status: 204 }));
+        await serveSites(page);
+        await page.goto('/');
+        await expect(page.locator('[data-connection]')).toHaveText('Live');
+        const main = page.locator('main');
+        const card = main.getByRole('article', { name: 'admin' });
+        await card.getByRole('button', { name: 'Start admin' }).click();
+        const change = (seq: number, State: 'starting' | 'running') =>
+          envelope(seq, {
+            event: { Time: '', Project: 'admin', Server: '', State, Message: `state: ${State}` },
+          });
+        await api.send(change(2, 'starting'), change(3, 'running'));
+        await expect(card).toContainText('Running');
+        await expect(card.getByRole('link', { name: 'Open admin in the browser' })).toHaveAttribute(
+          'href',
+          'https://admin.lab.example.dev',
+        );
+        await card.getByRole('link', { name: 'Preview admin' }).click();
+        await expect(page).toHaveURL(/\/projects\/admin$/);
+        await expect(page.locator('iframe[data-preview]')).toHaveAttribute(
+          'src',
+          'https://admin.lab.example.dev',
+        );
+        await expect(page.getByRole('link', { name: 'Open in browser' })).toHaveAttribute(
+          'href',
+          'https://admin.lab.example.dev',
+        );
+      });
+
+      test("a route the network doesn't have says why, and links nowhere", async ({ page }) => {
+        // docs-site runs but has no network address yet; storefront's mail route has none.
+        const state = structuredClone(canvas);
+        delete state.sites!['docs-site'].routes![0].networkUrl;
+        delete state.sites!.storefront.routes![1].networkUrl;
+        delete state.sites!.admin.routes![0].networkUrl;
+        await fakeApi(page, { state });
+        await serveSites(page);
+        await page.goto('/');
+        const main = page.locator('main');
+        const card = main.getByRole('article', { name: 'docs-site' });
+        await expect(card).toContainText('Not on the network yet');
+        await expect(card.getByRole('link')).toHaveCount(0);
+        await expect(
+          card.getByRole('button', { name: 'Preview docs-site', includeHidden: true }),
+        ).toBeDisabled();
+        await expect(
+          card.getByRole('button', { name: 'Open docs-site in the browser' }),
+        ).toBeDisabled();
+        await expect(
+          card.getByRole('button', { name: 'Open docs-site in the browser' }),
+        ).toHaveAccessibleDescription('Not on the network yet');
+        await expect(main.locator('a[href*=".test"]')).toHaveCount(0);
+
+        await page.goto('/projects/storefront');
+        await expect(page.locator('iframe[data-preview]')).toBeVisible();
+        if (phone) {
+          await page.getByRole('combobox', { name: 'Route' }).selectOption('mail.storefront');
+        } else {
+          await page
+            .getByRole('tablist', { name: 'Routes' })
+            .getByRole('tab', { name: 'mail.storefront' })
+            .click();
+        }
+        await expect(page.locator('iframe[data-preview]')).toHaveCount(0);
+        await expect(page.getByText("storefront isn't on the network yet")).toBeVisible();
+        const open = page.getByRole('button', { name: 'Open in browser' });
+        await expect(open).toBeDisabled();
+        await expect(open).toHaveAccessibleDescription('Not on the network yet');
+        await expect(page.getByRole('link', { name: 'Open in browser' })).toHaveCount(0);
+
+        // A stopped project the network doesn't have: start it to open it here.
+        await page.goto('/projects/admin');
+        await expect(page.getByRole('heading', { name: 'admin is stopped' })).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: 'Open in browser' }),
+        ).toHaveAccessibleDescription('Start it to open it here');
+        await expect(page.locator('a[href*=".test"]')).toHaveCount(0);
+      });
+
       test('an unknown project says so, with the way back', async ({ page }) => {
         await fakeApi(page, { state: canvas });
         await page.goto('/projects/nope');

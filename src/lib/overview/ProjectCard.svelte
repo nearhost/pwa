@@ -6,7 +6,14 @@
   import StateDot from '#lib/ui/StateDot.svelte';
   import { alwaysBrowser, openProjectsIn } from '#lib/settings.js';
   import { actionError } from './actions.svelte.js';
-  import { addressOf, hostOf, previewLink, stateLabel, type ProjectView } from './model.js';
+  import {
+    addressOf,
+    hostOf,
+    previewLink,
+    stateLabel,
+    unservedReason,
+    type ProjectView,
+  } from './model.js';
 
   let { project, networked, live }: { project: ProjectView; networked: boolean; live: boolean } =
     $props();
@@ -14,6 +21,8 @@
   const id = $derived(`project-${project.name}`);
   const state = $derived(project.status.State);
   const address = $derived(addressOf(project.primary, networked));
+  // On a networked core, why the primary route can't be opened from here (no network address).
+  const unserved = $derived(unservedReason(project.primary, networked, state));
   const link = $derived(
     previewLink(project.name, address, {
       openIn: openProjectsIn(),
@@ -38,13 +47,17 @@
   <span class="dot"><StateDot {state} /></span>
   <div class="title">
     <h3 {id}>{project.name}</h3>
-    {#if address}<div class="host">{hostOf(address)}</div>{/if}
+    {#if address}
+      <div class="host">{hostOf(address)}</div>
+    {:else if unserved && running}
+      <div class="host unserved" id={`${id}-unserved`}>{unserved}</div>
+    {/if}
     <div class="detail" data-state={state}>{detail}</div>
   </div>
   <span class="pill" data-state={state}>
     {#if state !== 'stopped'}<StateDot {state} size={6} />{/if}{stateLabel(state)}
   </span>
-  {#if running}
+  {#if running && !unserved}
     <!-- On a phone the row itself opens the preview. -->
     <a
       class="stretch"
@@ -55,7 +68,27 @@
     ></a>
   {/if}
   <div class="actions">
-    {#if running}
+    {#if running && unserved}
+      <!-- Not on the network: nothing to open, said rather than a dead link. -->
+      <button
+        type="button"
+        class="preview"
+        disabled
+        aria-label={`Preview ${project.name}`}
+        aria-describedby={`${id}-unserved`}
+      >
+        <Icon name="frame" size={18} stroke={2} />Preview
+      </button>
+      <button
+        type="button"
+        class="icon-button"
+        disabled
+        aria-label={`Open ${project.name} in the browser`}
+        aria-describedby={`${id}-unserved`}
+      >
+        <Icon name="external" size={18} stroke={2} />
+      </button>
+    {:else if running}
       <a
         class="preview"
         href={link.href}
@@ -136,6 +169,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .host.unserved {
+    font-family: inherit;
   }
 
   .detail {
@@ -235,6 +272,17 @@
 
   .icon-button:hover {
     background: var(--nh-raised);
+  }
+
+  .preview:disabled,
+  .icon-button:disabled {
+    background: var(--nh-raised);
+    color: var(--nh-muted);
+    font: inherit;
+    font-weight: 600;
+    border: 0;
+    cursor: not-allowed;
+    transform: none;
   }
 
   .preview:active,

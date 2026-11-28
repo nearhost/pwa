@@ -42,6 +42,11 @@ export interface FakeApiOptions {
   network?: Partial<NetworkInfo> | null;
   /** Open the event stream as soon as the app connects (the default), or leave it to the test. */
   open?: boolean;
+  /**
+   * Answer the state as the core does on a networked machine: a route's networkUrl only while its
+   * project runs (running or degraded), so a project started after a read has none until the next.
+   */
+  networkWhileRunning?: boolean;
 }
 
 export interface FakeApi {
@@ -111,8 +116,18 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
     async send(...envelopes) {
       // As the core's: the state is as new as everything sent (a reset starts the numbers again),
       // so a read the app makes after these never leaves a gap behind it.
+      // A project's state change is in the state from then on, as the core's.
       for (const e of envelopes) {
         api.state.seq = e.kind === 'reset' ? e.seq : Math.max(api.state.seq, e.seq);
+        const change = e.kind === 'event' ? e.event : undefined;
+        const project = change?.Project ? api.state.projects?.[change.Project] : undefined;
+        if (change?.State && project) {
+          project.State = change.State;
+          const prefix = `state: ${change.State}: `;
+          project.Message = change.Message.startsWith(prefix)
+            ? change.Message.slice(prefix.length)
+            : '';
+        }
       }
       await page.evaluate((all) => {
         const last = window.__nearhostFakeEvents!.instances.at(-1)!;
@@ -259,7 +274,9 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
       return json(answer.status ?? 200, answer.body);
     }
     if (fake.method === 'GET' && url.pathname === '/api/v1/session') return json(200, session);
-    if (fake.method === 'GET' && url.pathname === '/api/v1/state') return json(200, api.state);
+    if (fake.method === 'GET' && url.pathname === '/api/v1/state') {
+      return json(200, opts.networkWhileRunning ? servedState(api.state) : api.state);
+    }
     if (fake.method === 'GET' && url.pathname === '/api/v1/status') {
       const status: Status = {
         info: {
@@ -381,6 +398,17 @@ export function serveDocument(doc: FakeDocument | undefined, query: URLSearchPar
     headers: { 'Content-Security-Policy': theme ? csp.themedHTML : csp.html },
     body,
   };
+}
+
+// The state with a route's networkUrl only where its project runs, as a networked core gives it.
+function servedState(state: State): State {
+  const copy = structuredClone(state);
+  for (const [name, site] of Object.entries(copy.sites ?? {})) {
+    const running = ['running', 'degraded'].includes(copy.projects?.[name]?.State ?? '');
+    if (running) continue;
+    for (const route of site.routes ?? []) delete route.networkUrl;
+  }
+  return copy;
 }
 
 function parseBody(request: Request): unknown {

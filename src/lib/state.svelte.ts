@@ -155,8 +155,9 @@ export function startState(
  * Brings state up to date with envelope, which comes next after it, and says whether the state
  * must be read again for the rest: an envelope applied in part (an approval, its end), one that
  * carries no state (a passthrough opened, a document shown, a config applied), a server's event
- * (the state of a server's connection is not in its events) and a state change of a project the
- * state does not have yet. The screens that need more of an envelope (logs, opened passthroughs,
+ * (the state of a server's connection is not in its events), a state change of a project the
+ * state does not have yet, and one into or out of what the proxy serves (running, starting,
+ * degraded), whose network addresses only the state has. The screens that need more of an envelope (logs, opened passthroughs,
  * shown documents) take it as they come.
  */
 export function applyEnvelope(state: State, envelope: Envelope): boolean {
@@ -193,10 +194,18 @@ function applyEvent(state: State, event: EngineEvent): boolean {
   if (!event.State) return false;
   const project = state.projects?.[event.Project];
   if (!project) return true;
+  const was = project.State;
   project.State = event.State;
   project.Message = reasonOf(event);
   project.Problem = event.Report ?? null;
-  return false;
+  // The core gives a route's network address only while the proxy serves the project, so one
+  // that starts or stops is read again for its routes. Its new state shows meanwhile.
+  return was !== event.State && (served(was) || served(event.State));
+}
+
+// The states in which the proxy may serve a project: what it serves changes going in or out.
+function served(state: EngineEvent['State']): boolean {
+  return state === 'running' || state === 'starting' || state === 'degraded';
 }
 
 // The reason in a state change's message, "state: <state>: <reason>"; "" when it gives none.

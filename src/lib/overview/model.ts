@@ -83,12 +83,29 @@ export function isWebAddress(address: string | undefined): address is string {
 
 /**
  * Where a route opens: its network address on a networked core, else its local one; undefined
- * for one that is not an http or https address.
+ * for one that is not an http or https address. On a networked core a route with no network
+ * address has none: the device can't reach the local name (see unservedReason).
  */
 export function addressOf(route: SiteRoute | undefined, networked: boolean): string | undefined {
   if (!route) return undefined;
-  const address = (networked && route.networkUrl) || route.url;
+  const address = networked ? route.networkUrl : route.url;
   return isWebAddress(address) ? address : undefined;
+}
+
+/**
+ * Why a route can't be opened from this device: on a networked core, one the core hasn't put on
+ * the network, which it does only while the project runs. Undefined when it can be, or off a
+ * networked core.
+ */
+export function unservedReason(
+  route: SiteRoute | undefined,
+  networked: boolean,
+  state: EngineState,
+): string | undefined {
+  if (!route || !networked || route.networkUrl) return undefined;
+  return state === 'stopped' || state === 'error'
+    ? 'Start it to open it here'
+    : 'Not on the network yet';
 }
 
 /** Where Preview goes: the app's preview, or the browser when the device or project says so. */

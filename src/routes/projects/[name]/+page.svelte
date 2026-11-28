@@ -7,7 +7,7 @@
   import ConnectionNotice from '#lib/shell/ConnectionNotice.svelte';
   import Icon from '#lib/ui/Icon.svelte';
   import StartStop from '#lib/ui/StartStop.svelte';
-  import { addressOf, stateLabel } from '#lib/overview/model.js';
+  import { addressOf, stateLabel, unservedReason } from '#lib/overview/model.js';
   import { actionError } from '#lib/overview/actions.svelte.js';
   import { projectLogs } from '#lib/preview/logs.svelte.js';
   import { frameWidths, isCrossSite, type FrameWidth } from '#lib/preview/model.js';
@@ -37,6 +37,8 @@
 
   const route = $derived(routes[Math.min(selected, routes.length - 1)]);
   const address = $derived(addressOf(route, networked));
+  // On a networked core, why this route can't be opened from here (no network address).
+  const unserved = $derived(status && unservedReason(route, networked, status.State));
   const crossSite = $derived(address ? isCrossSite(address, page.url.hostname) : false);
   const framed = $derived(status?.State === 'running' || status?.State === 'degraded');
   const error = $derived(status ? actionError(name, status.State) : undefined);
@@ -65,9 +67,17 @@
         <a class="open" href={address} target="_blank" rel="noopener">
           <Icon name="external" size={18} stroke={2} />Open in browser
         </a>
+      {:else if unserved}
+        <button type="button" class="open" disabled aria-describedby="unserved">
+          <Icon name="external" size={18} stroke={2} />Open in browser
+        </button>
       {/if}
     </div>
-    {#if address}
+    {#if unserved}
+      <div class="address">
+        <span class="reason" id="unserved">{unserved}</span>
+      </div>
+    {:else if address}
       <div class="address">
         <span class="lock"><Icon name="lock" size={14} stroke={2} /></span>
         <span class="url">{address}</span>
@@ -99,6 +109,8 @@
         </span>
         {#if error}<p class="error" role="alert">{error}</p>{/if}
       </div>
+    {:else if unserved}
+      <div class="panel"><p>{name} isn't on the network yet, so it can't be shown here.</p></div>
     {:else if !address}
       <div class="panel"><p>{name} has no web route to show.</p></div>
     {:else}
@@ -217,6 +229,20 @@
   .text-link:focus-visible {
     outline: 2px solid var(--nh-accent);
     outline-offset: 2px;
+  }
+
+  .open:disabled {
+    border: 0;
+    background: var(--nh-raised);
+    color: var(--nh-muted);
+    font: inherit;
+    font-weight: 600;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .reason {
+    color: var(--nh-body);
   }
 
   .address {

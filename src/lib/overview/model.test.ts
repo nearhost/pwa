@@ -3,6 +3,7 @@ import { state } from '#lib/api/testing.js';
 import type { State } from '#lib/api/types.js';
 import {
   addressOf,
+  unservedReason,
   documentCount,
   filterGroups,
   groupByMachine,
@@ -120,8 +121,10 @@ describe('addressOf', () => {
     expect(addressOf(route, false)).toBe('https://shop.test');
   });
 
-  it('is the local address when the route has no network address', () => {
-    expect(addressOf({ ...route, networkUrl: undefined }, true)).toBe('https://shop.test');
+  it('is undefined on a networked core when the route has no network address', () => {
+    // The device can't reach the local .test name; never a dead link.
+    expect(addressOf({ ...route, networkUrl: undefined }, true)).toBeUndefined();
+    expect(addressOf({ ...route, networkUrl: '' }, true)).toBeUndefined();
   });
 
   it('is undefined for an address that is not http or https', () => {
@@ -133,6 +136,32 @@ describe('addressOf', () => {
 
   it('is undefined without a route', () => {
     expect(addressOf(undefined, true)).toBeUndefined();
+  });
+});
+
+describe('unservedReason', () => {
+  const route = { host: 'shop.test', port: 80, url: 'https://shop.test' };
+  const served = { ...route, networkUrl: 'https://shop.lab.example.dev' };
+
+  it('is undefined for a route the network has, or off a networked core', () => {
+    expect(unservedReason(served, true, 'running')).toBeUndefined();
+    expect(unservedReason(route, false, 'running')).toBeUndefined();
+    expect(unservedReason(route, false, 'stopped')).toBeUndefined();
+  });
+
+  it('is undefined without a route', () => {
+    expect(unservedReason(undefined, true, 'running')).toBeUndefined();
+  });
+
+  it('says to start a stopped project, on a networked core, to open it here', () => {
+    expect(unservedReason(route, true, 'stopped')).toBe('Start it to open it here');
+    expect(unservedReason(route, true, 'error')).toBe('Start it to open it here');
+  });
+
+  it('says a running or starting one is not on the network yet', () => {
+    expect(unservedReason(route, true, 'running')).toBe('Not on the network yet');
+    expect(unservedReason(route, true, 'starting')).toBe('Not on the network yet');
+    expect(unservedReason(route, true, 'degraded')).toBe('Not on the network yet');
   });
 });
 
