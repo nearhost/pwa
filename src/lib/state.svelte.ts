@@ -98,15 +98,19 @@ export function startState(
   });
   endState = () => controller.abort();
 
-  const readSession = () =>
-    client.session().then(
+  // Each read's number: an older read that answers after a newer one is ignored.
+  let sessionReads = 0;
+  const readSession = () => {
+    const n = ++sessionReads;
+    return client.session().then(
       (session) => {
-        if (!signal.aborted) appState.session = session;
+        if (!signal.aborted && n === sessionReads) appState.session = session;
       },
       () => {
         // A 401 says signed out through the observer; anything else, the stream finds too.
       },
     );
+  };
   void readSession();
 
   const events = openEvents({
@@ -119,6 +123,8 @@ export function startState(
     },
     onEnvelope(envelope, info) {
       answered();
+      // A config applied may switch networking on or off, or rename the machine: the session says.
+      if (envelope.kind === 'config') void readSession();
       // One the state already includes changes nothing there; without a state, read it.
       let again = false;
       if (!info.inState) again = appState.state ? applyEnvelope(appState.state, envelope) : true;

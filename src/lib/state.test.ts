@@ -406,6 +406,23 @@ describe('startState', () => {
     expect(appState.lastAnswered?.getTime()).toBe(Date.parse('2026-11-27T10:00:20Z'));
   });
 
+  it('reads the session again, as well as the state, after a config is applied', async () => {
+    const t = setup(state(5));
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    expect(appState.session?.networked).toBe(true);
+    // The core stopped serving the network, and its name changed with the new config.
+    t.fake.on('GET /api/v1/session', () => json(session({ networked: false, machine: 'kronos' })));
+    t.fake.on('GET /api/v1/state', () => json(state(6, { clients: 2 })));
+    FakeEventSource.last.send(envelope(6, { kind: 'config' }));
+    await settle();
+    expect(t.fake.count('GET /api/v1/session')).toBe(2);
+    expect(appState.session?.networked).toBe(false);
+    expect(appState.session?.machine).toBe('kronos');
+    expect(appState.state?.clients).toBe(2);
+  });
+
   it('counts a heartbeat as an answer', async () => {
     const t = setup();
     stops.push(t.stop);
