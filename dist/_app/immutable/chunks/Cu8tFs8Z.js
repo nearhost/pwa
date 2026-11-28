@@ -1,0 +1,1 @@
+import{R as e}from"./B_f5ps0R.js";import{i as t}from"./BaVlNql5.js";function n(t=200){let n=e({});return{take(e){let r=e.kind===`event`?e.event:void 0;if(!r?.Project||r.State)return;let i=n[r.Project]??[];i.push(r.Message),i.length>t&&i.splice(0,i.length-t),n[r.Project]=i},lines(e){return n[e]??[]}}}var r=n();function i(){return t(e=>r.take(e))}export{i as n,r as t};

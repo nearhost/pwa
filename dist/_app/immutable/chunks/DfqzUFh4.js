@@ -1,0 +1,1 @@
+import{E as e,U as t,l as n,o as r,t as i,w as a}from"./B_f5ps0R.js";var o=e(`<span class="dot svelte-1avbh7e" data-state-dot="" aria-hidden="true"></span>`);function s(e,s){let c=i(s,`size`,3,8);var l=o();let u;t(()=>{r(l,`data-state`,s.state),u=n(l,``,u,{"--size":`${c()??``}px`})}),a(e,l)}export{s as t};

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nearhost</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#111013" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f4f6" media="(prefers-color-scheme: light)" />
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Nearhost" />
+    <!-- The page runs up under the status bar; the shell's band keeps that area clear. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta http-equiv="content-security-policy" content="default-src 'none'; frame-src 'self' https:; worker-src 'self'; connect-src 'self'; font-src 'self'; img-src 'self' data:; manifest-src 'self'; script-src 'self' 'sha256-Uwj/Q90AP18vrLAH1yIyqzIAjhdC+hztkNlOlR/2edA='; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'">
+		<link href="/_app/immutable/entry/start.D3tnEMRQ.js" rel="modulepreload">
+		<link href="/_app/immutable/entry/payload.DSmR2FwN.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DUTjbZNf.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/Bs66-ByN.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/B_f5ps0R.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/eIpeAj6r.js" rel="modulepreload">
+		<link href="/_app/immutable/entry/app.K9KtFHdc.js" rel="modulepreload">
+		<link href="/_app/immutable/nodes/0.DLzo1cXN.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/DADjyPuK.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/K9jHLhmN.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/AecKmgIE.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/BaVlNql5.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/Cu8tFs8Z.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/ZL1vS3IS.js" rel="modulepreload">
+		<link href="/_app/immutable/chunks/45LuNr4_.js" rel="modulepreload">
+		
+		<link href="/_app/immutable/assets/Mark.DTv4pMJr.css" rel="stylesheet">
+		<link href="/_app/immutable/assets/Icon.MvzS7mkx.css" rel="stylesheet">
+		<link href="/_app/immutable/assets/0.DatkPzCp.css" rel="stylesheet">
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">
+			<script>
+				{
+					__sveltekit_1x6e4c9 = {
+						base: "",
+						version: "1795846030395"
+					};
+
+					const element = document.currentScript.parentElement;
+
+					import("/_app/immutable/entry/start.D3tnEMRQ.js").then(async (kit) => {
+						kit.init(__sveltekit_1x6e4c9);
+						const app = await import("/_app/immutable/entry/app.K9KtFHdc.js");
+						kit.start(app, element);
+					});
+
+					if ('serviceWorker' in navigator) {
+						const script_url = '/service-worker.js';
+						const policy = globalThis?.window?.trustedTypes?.createPolicy(
+							'sveltekit-trusted-url',
+							{ createScriptURL(url) { return url; } }
+						);
+						const sanitised = policy?.createScriptURL(script_url) ?? script_url;
+						addEventListener('load', function () {
+							navigator.serviceWorker.register(sanitised, { type: 'module' });
+						});
+					}
+				}
+			</script>
+		</div>
+  </body>
+</html>
