@@ -56,7 +56,7 @@ for (const size of sizes) {
         await expect(inFrame(page).locator('html')).toHaveAttribute('data-nh-theme', 'paper');
         await expect(inFrame(page).locator('body')).toHaveCSS(
           'background-color',
-          'rgb(244, 245, 241)',
+          'rgb(246, 244, 246)',
         );
         expect(api.documentRequests).toContain('/d/T1/docs/plans/checkout.md?theme=paper');
 
@@ -113,7 +113,7 @@ for (const size of sizes) {
         await expect(inFrame(page).locator('html')).toHaveAttribute('data-nh-scheme', scheme);
         await expect(inFrame(page).locator('body')).toHaveCSS(
           'background-color',
-          scheme === 'dark' ? 'rgb(15, 18, 16)' : 'rgb(244, 245, 241)',
+          scheme === 'dark' ? 'rgb(17, 16, 19)' : 'rgb(246, 244, 246)',
         );
         expect(await page.evaluate(() => localStorage.getItem('nearhost.documentsTheme'))).toBe(
           'app',

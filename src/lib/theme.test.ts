@@ -97,8 +97,8 @@ describe('theme-color', () => {
     localStorage.clear();
     // As app.html has them: one for each scheme.
     document.head.innerHTML =
-      '<meta name="theme-color" content="#0f1210" media="(prefers-color-scheme: dark)">' +
-      '<meta name="theme-color" content="#f4f5f1" media="(prefers-color-scheme: light)">';
+      '<meta name="theme-color" content="#111013" media="(prefers-color-scheme: dark)">' +
+      '<meta name="theme-color" content="#f6f4f6" media="(prefers-color-scheme: light)">';
   });
 
   afterEach(() => {
@@ -107,31 +107,31 @@ describe('theme-color', () => {
   });
 
   it('is the ground of each scheme', () => {
-    expect(themeColors).toEqual({ dark: '#0f1210', light: '#f4f5f1' });
+    expect(themeColors).toEqual({ dark: '#111013', light: '#f6f4f6' });
   });
 
   it('follows a light or dark override in both schemes, and each its own under system', () => {
     setAppearance('light');
     expect(metas()).toEqual([
-      ['(prefers-color-scheme: dark)', '#f4f5f1'],
-      ['(prefers-color-scheme: light)', '#f4f5f1'],
+      ['(prefers-color-scheme: dark)', '#f6f4f6'],
+      ['(prefers-color-scheme: light)', '#f6f4f6'],
     ]);
     setAppearance('dark');
     expect(metas()).toEqual([
-      ['(prefers-color-scheme: dark)', '#0f1210'],
-      ['(prefers-color-scheme: light)', '#0f1210'],
+      ['(prefers-color-scheme: dark)', '#111013'],
+      ['(prefers-color-scheme: light)', '#111013'],
     ]);
     setAppearance('system');
     expect(metas()).toEqual([
-      ['(prefers-color-scheme: dark)', '#0f1210'],
-      ['(prefers-color-scheme: light)', '#f4f5f1'],
+      ['(prefers-color-scheme: dark)', '#111013'],
+      ['(prefers-color-scheme: light)', '#f6f4f6'],
     ]);
   });
 
   it('follows the stored appearance on start', () => {
     localStorage.setItem(storageKey, 'light');
     applyStoredAppearance();
-    expect(metas().map(([, content]) => content)).toEqual(['#f4f5f1', '#f4f5f1']);
+    expect(metas().map(([, content]) => content)).toEqual(['#f6f4f6', '#f6f4f6']);
   });
 
   it('keeps an appearance for the session when storage throws', () => {

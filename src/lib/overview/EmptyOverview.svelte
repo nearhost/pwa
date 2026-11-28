@@ -93,7 +93,7 @@
 
   .primary {
     background: var(--nh-accent);
-    color: var(--pwa-accent-ink);
+    color: var(--nh-accent-ink);
   }
 
   .secondary {

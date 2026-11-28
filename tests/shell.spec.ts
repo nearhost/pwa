@@ -6,8 +6,8 @@ import { schemes, sizes } from './sizes.js';
 // schemes. Desktop browsers report every safe-area inset as 0, which is the case the floors are
 // for: an installed app whose status bar inset reads 0.
 
-const grounds = { dark: 'rgb(15, 18, 16)', light: 'rgb(244, 245, 241)' } as const;
-const surfaces = { dark: 'rgb(22, 26, 23)', light: 'rgb(255, 255, 255)' } as const;
+const grounds = { dark: 'rgb(17, 16, 19)', light: 'rgb(246, 244, 246)' } as const;
+const surfaces = { dark: 'rgb(25, 23, 28)', light: 'rgb(255, 255, 255)' } as const;
 
 const interactive = 'a, button, input, select, [tabindex]';
 
@@ -69,7 +69,7 @@ for (const size of sizes) {
         }));
         expect(colours.html).toBe(grounds[scheme]);
         expect(colours.body).toBe(grounds[scheme]);
-        expect(colours.token.toLowerCase()).toBe(scheme === 'dark' ? '#0f1210' : '#f4f5f1');
+        expect(colours.token.toLowerCase()).toBe(scheme === 'dark' ? '#111013' : '#f6f4f6');
       });
 
       test('installed, the band takes its floor and the header sits below it', async ({ page }) => {
