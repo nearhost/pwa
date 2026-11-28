@@ -37,3 +37,29 @@ export function setAlwaysBrowser(name: string, on: boolean) {
     // Not kept in storage; remembered above for this session.
   }
 }
+
+/** How the reader shows a document: on paper, in the app's colours, or as the agent wrote it. */
+export type DocumentsTheme = 'paper' | 'app' | 'written';
+
+const themeKey = 'nearhost.documentsTheme';
+let rememberedTheme: DocumentsTheme | undefined;
+
+function isDocumentsTheme(value: unknown): value is DocumentsTheme {
+  return value === 'paper' || value === 'app' || value === 'written';
+}
+
+/** The reader's theme on this device: paper unless set. */
+export function documentsTheme(): DocumentsTheme {
+  if (rememberedTheme) return rememberedTheme;
+  const stored = read(themeKey);
+  return isDocumentsTheme(stored) ? stored : 'paper';
+}
+
+export function setDocumentsTheme(theme: DocumentsTheme) {
+  rememberedTheme = theme;
+  try {
+    localStorage.setItem(themeKey, theme);
+  } catch {
+    // Not kept in storage; remembered above for this session.
+  }
+}

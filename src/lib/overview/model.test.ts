@@ -192,7 +192,7 @@ describe('labels and counts', () => {
     expect(waitingCount(undefined)).toBe(0);
   });
 
-  it('counts the documents of the folders that are shown', () => {
+  it('counts the documents the Documents list shows, hidden folders’ included', () => {
     const s = state(1, {
       documents: [
         { Hidden: false, Docs: [{}, {}] },
@@ -200,6 +200,6 @@ describe('labels and counts', () => {
         { Hidden: false, Docs: null },
       ] as State['documents'],
     });
-    expect(documentCount(s)).toBe(2);
+    expect(documentCount(s)).toBe(3);
   });
 });

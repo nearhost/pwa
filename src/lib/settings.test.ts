@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { alwaysBrowser, openProjectsIn, setAlwaysBrowser } from './settings.js';
+import {
+  alwaysBrowser,
+  documentsTheme,
+  openProjectsIn,
+  setAlwaysBrowser,
+  setDocumentsTheme,
+} from './settings.js';
 
 let store: Map<string, string>;
 
@@ -52,5 +58,37 @@ describe('device settings', () => {
     expect(alwaysBrowser('shop')).toBe(true);
     setAlwaysBrowser('shop', false);
     expect(alwaysBrowser('shop')).toBe(false);
+  });
+});
+
+describe('the documents theme', () => {
+  it('is paper unless the device says app or written', () => {
+    expect(documentsTheme()).toBe('paper');
+    store.set('nearhost.documentsTheme', 'app');
+    expect(documentsTheme()).toBe('app');
+    store.set('nearhost.documentsTheme', 'written');
+    expect(documentsTheme()).toBe('written');
+    store.set('nearhost.documentsTheme', 'nonsense');
+    expect(documentsTheme()).toBe('paper');
+  });
+
+  it('is kept under nearhost.documentsTheme', () => {
+    setDocumentsTheme('app');
+    expect(store.get('nearhost.documentsTheme')).toBe('app');
+    expect(documentsTheme()).toBe('app');
+    setDocumentsTheme('paper');
+    expect(store.get('nearhost.documentsTheme')).toBe('paper');
+  });
+
+  it('lasts the session when storage throws', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+    expect(documentsTheme()).toBe('paper');
+    expect(() => setDocumentsTheme('written')).not.toThrow();
+    expect(documentsTheme()).toBe('written');
+    setDocumentsTheme('paper');
+    expect(documentsTheme()).toBe('paper');
   });
 });

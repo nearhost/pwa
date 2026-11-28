@@ -132,9 +132,12 @@ export function waitingCount(state: State | undefined): number {
   return (state.approvals?.length ?? 0) + changes;
 }
 
-/** The documents in the folders that are shown. */
+/**
+ * The documents served, as the Documents list shows them. A tree in a hidden folder (Hidden, such
+ * as ~/.claude/plans) is listed too: the core only limits what it serves from there.
+ */
 export function documentCount(state: State | undefined): number {
   let n = 0;
-  for (const tree of state?.documents ?? []) if (!tree.Hidden) n += tree.Docs?.length ?? 0;
+  for (const tree of state?.documents ?? []) n += tree.Docs?.length ?? 0;
   return n;
 }
