@@ -4,6 +4,7 @@ import {
   documentsTheme,
   openProjectsIn,
   setAlwaysBrowser,
+  setOpenProjectsIn,
   setDocumentsTheme,
 } from './settings.js';
 
@@ -90,5 +91,34 @@ describe('the documents theme', () => {
     expect(documentsTheme()).toBe('written');
     setDocumentsTheme('paper');
     expect(documentsTheme()).toBe('paper');
+  });
+});
+
+describe('where projects open', () => {
+  it('is kept under nearhost.openProjectsIn', () => {
+    setOpenProjectsIn('browser');
+    expect(store.get('nearhost.openProjectsIn')).toBe('browser');
+    expect(openProjectsIn()).toBe('browser');
+    setOpenProjectsIn('app');
+    expect(store.get('nearhost.openProjectsIn')).toBe('app');
+    expect(openProjectsIn()).toBe('app');
+  });
+
+  it('lasts the session when storage throws, and storage wins again once it works', () => {
+    const blocked = () => {
+      throw new Error('blocked');
+    };
+    vi.stubGlobal('localStorage', { getItem: blocked, setItem: blocked, removeItem: blocked });
+    expect(() => setOpenProjectsIn('browser')).not.toThrow();
+    expect(openProjectsIn()).toBe('browser');
+    vi.unstubAllGlobals();
+    store = new Map([['nearhost.openProjectsIn', 'app']]);
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    });
+    setOpenProjectsIn('app');
+    expect(openProjectsIn()).toBe('app');
   });
 });

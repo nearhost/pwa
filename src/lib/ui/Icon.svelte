@@ -41,6 +41,7 @@
       'M7 7.5h.01M7 16.5h.01',
     ],
     port: ['M4 12h11M11 8l4 4-4 4', 'M19 5v14'],
+    share: ['M12 3v12M7 8l5-5 5 5', 'M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6'],
   } as const;
 
   // Shapes drawn filled rather than stroked.

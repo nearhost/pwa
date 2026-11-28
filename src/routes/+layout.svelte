@@ -11,6 +11,7 @@
   import { page } from '$app/state';
   import Sidebar from '#lib/overview/Sidebar.svelte';
   import SectionTabs from '#lib/overview/SectionTabs.svelte';
+  import NotPaired from '#lib/shell/NotPaired.svelte';
 
   let { children }: { children: Snippet } = $props();
 
@@ -27,9 +28,12 @@
     };
   });
 
+  // Not paired, every route shows how to pair instead.
+  const signedOut = $derived(appState.connection === 'signed-out');
   // A preview and the reader fill the space below the header with their frame.
   const fill = $derived(
-    page.route.id === '/projects/[name]' || page.route.id === '/documents/[...path]',
+    !signedOut &&
+      (page.route.id === '/projects/[name]' || page.route.id === '/documents/[...path]'),
   );
   const machine = $derived(appState.session?.machine || 'this machine');
   const line = $derived(
@@ -50,7 +54,11 @@
     <span class="machine-name" data-machine>{machine}</span>
     <span class="connection" data-connection={appState.connection} role="status">{line}</span>
   {/snippet}
-  {@render children()}
+  {#if signedOut}
+    <NotPaired />
+  {:else}
+    {@render children()}
+  {/if}
 </Shell>
 
 <style>

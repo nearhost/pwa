@@ -11,6 +11,10 @@ export type Session = Schemas['Session'];
 export type State = Schemas['State'];
 export type Envelope = Schemas['Envelope'];
 export type Problem = Schemas['Problem'];
+export type Info = Schemas['Info'];
+export type Status = Schemas['Status'];
+export type NetworkInfo = Schemas['NetworkInfo'];
+export type DeviceInfo = Schemas['DeviceInfo'];
 
 /** The methods that change something; the gate treats any method but GET and HEAD as a write. */
 export type WriteMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE';

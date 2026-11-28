@@ -12,15 +12,17 @@ export function connectionReason(
   waits = 'starting and stopping',
 ): string | undefined {
   const Waits = waits.charAt(0).toUpperCase() + waits.slice(1);
+  // "Answering waits", "revoking and unpairing wait".
+  const wait = / and /.test(waits) ? 'wait' : 'waits';
   switch (connection) {
     case 'live':
       return undefined;
     case 'connecting':
-      return `Connecting to ${machine}. ${Waits} waits until it answers.`;
+      return `Connecting to ${machine}. ${Waits} ${wait} until it answers.`;
     case 'lost':
       return lastAnswered
-        ? `Can't reach ${machine}. This is what it said at ${time.format(lastAnswered)}; ${waits} waits until it's back.`
-        : `Can't reach ${machine}. ${Waits} waits until it's back.`;
+        ? `Can't reach ${machine}. This is what it said at ${time.format(lastAnswered)}; ${waits} ${wait} until it's back.`
+        : `Can't reach ${machine}. ${Waits} ${wait} until it's back.`;
     case 'signed-out':
       return `This device isn't paired with ${machine}, so nothing here can be changed.`;
   }

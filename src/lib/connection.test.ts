@@ -10,19 +10,19 @@ describe('connectionReason', () => {
 
   it('says it is connecting', () => {
     expect(connectionReason('connecting', 'leto', undefined)).toBe(
-      'Connecting to leto. Starting and stopping waits until it answers.',
+      'Connecting to leto. Starting and stopping wait until it answers.',
     );
   });
 
   it('says the machine is out of reach, and when it last answered', () => {
     const reason = connectionReason('lost', 'leto', at)!;
     expect(reason).toMatch(/^Can't reach leto\. This is what it said at 10:42/);
-    expect(reason).toMatch(/starting and stopping waits until it's back\.$/);
+    expect(reason).toMatch(/starting and stopping wait until it's back\.$/);
   });
 
   it('says the machine is out of reach without a time when it never answered', () => {
     expect(connectionReason('lost', 'leto', undefined)).toBe(
-      "Can't reach leto. Starting and stopping waits until it's back.",
+      "Can't reach leto. Starting and stopping wait until it's back.",
     );
   });
 
@@ -38,6 +38,15 @@ describe('connectionReason', () => {
     );
     expect(connectionReason('lost', 'leto', undefined, 'answering')).toBe(
       "Can't reach leto. Answering waits until it's back.",
+    );
+  });
+
+  it('says wait for two actions', () => {
+    expect(connectionReason('connecting', 'leto', undefined, 'revoking and unpairing')).toBe(
+      'Connecting to leto. Revoking and unpairing wait until it answers.',
+    );
+    expect(connectionReason('lost', 'leto', at, 'revoking and unpairing')).toMatch(
+      /; revoking and unpairing wait until it's back\.$/,
     );
   });
 });

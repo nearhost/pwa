@@ -6,7 +6,14 @@
 import { readFileSync } from 'node:fs';
 import type { Page, Request } from '@playwright/test';
 import { session as makeSession, state as makeState } from '../src/lib/api/testing.js';
-import type { Envelope, Session, State } from '../src/lib/api/types.js';
+import type {
+  DeviceInfo,
+  Envelope,
+  NetworkInfo,
+  Session,
+  State,
+  Status,
+} from '../src/lib/api/types.js';
 
 export { envelope } from '../src/lib/api/testing.js';
 
@@ -26,6 +33,13 @@ export interface FakeApiOptions {
   session?: Partial<Session>;
   /** Answer every API request with 401, as for a browser that is not paired. */
   signedOut?: boolean;
+  /** The paired devices; by default this device (the session's) and a phone. */
+  devices?: DeviceInfo[];
+  /**
+   * How the core serves the network, merged over serving at nearhost.lab.example.dev with Let's
+   * Encrypt's certificates; null for a core that does not.
+   */
+  network?: Partial<NetworkInfo> | null;
   /** Open the event stream as soon as the app connects (the default), or leave it to the test. */
   open?: boolean;
 }
@@ -33,6 +47,10 @@ export interface FakeApiOptions {
 export interface FakeApi {
   /** The state GET /api/v1/state answers with now. */
   state: State;
+  /** The devices GET /api/v1/devices answers with now; DELETE takes one out. */
+  devices: DeviceInfo[];
+  /** Whether every API request is answered 401 now: set by the option, or by unpairing this device. */
+  signedOut: boolean;
   /** Every API request the app made, oldest first. */
   requests: FakeRequest[];
   /** Answers `METHOD /api/v1/...` with handler; it takes precedence over the defaults. */
@@ -79,6 +97,8 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
   const api: FakeApi = {
     // A copy, so a test that changes its state never changes a fixture another test shares.
     state: makeState(1, structuredClone(opts.state)),
+    devices: [],
+    signedOut: opts.signedOut ?? false,
     requests,
     on: (key, handler) => void handlers.set(key, handler),
     async open() {
@@ -112,6 +132,38 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
     documentRequests: [],
   };
   const session = makeSession(opts.session);
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  api.devices = structuredClone(
+    opts.devices ?? [
+      ...(session.device
+        ? [
+            {
+              name: session.device,
+              paired: new Date(now - day).toISOString(),
+              last_seen: new Date(now).toISOString(),
+              last_addr: '192.168.77.20:51234',
+            },
+          ]
+        : []),
+      {
+        name: 'Phone',
+        paired: new Date(now - 7 * day).toISOString(),
+        last_seen: new Date(now - 3 * day).toISOString(),
+        last_addr: '192.168.77.21:50410',
+      },
+    ],
+  );
+  const network: NetworkInfo | undefined =
+    opts.network === null
+      ? undefined
+      : {
+          on: true,
+          listening: true,
+          url: 'https://nearhost.lab.example.dev',
+          certificates: 'acme',
+          ...opts.network,
+        };
 
   await page.addInitScript((autoOpen: boolean) => {
     type Listener = (event: MessageEvent) => void;
@@ -178,7 +230,7 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
         contentType: status >= 400 ? 'application/problem+json' : 'application/json',
         body: body === undefined ? '' : JSON.stringify(body),
       });
-    if (opts.signedOut) {
+    if (api.signedOut) {
       return json(401, {
         error: 'Sign in',
         title: 'Sign in',
@@ -208,6 +260,54 @@ export async function fakeApi(page: Page, opts: FakeApiOptions = {}): Promise<Fa
     }
     if (fake.method === 'GET' && url.pathname === '/api/v1/session') return json(200, session);
     if (fake.method === 'GET' && url.pathname === '/api/v1/state') return json(200, api.state);
+    if (fake.method === 'GET' && url.pathname === '/api/v1/status') {
+      const status: Status = {
+        info: {
+          api: 1,
+          version: '0.17.0',
+          pid: 4242,
+          started: new Date(now - day).toISOString(),
+          startedBy: 'service',
+          reloads: true,
+          ...(api.state.info as Partial<Status['info']>),
+        },
+        servers: null,
+        projects: null,
+        approvals: null,
+        page: network?.url || 'https://nearhost.localhost',
+        network,
+      };
+      return json(200, status);
+    }
+    // As the core's: devices are listed and unpaired only while it serves the network.
+    if (url.pathname === '/api/v1/devices' || url.pathname.startsWith('/api/v1/devices/')) {
+      if (!network?.on) {
+        return json(409, {
+          error: 'Not networked',
+          title: 'This machine does not serve the network',
+          status: 409,
+          code: 'network.off',
+        });
+      }
+      if (fake.method === 'GET' && url.pathname === '/api/v1/devices') {
+        return json(200, api.devices);
+      }
+      const name = decodeURIComponent(url.pathname.slice('/api/v1/devices/'.length));
+      if (fake.method === 'DELETE' && name && !name.includes('/')) {
+        if (!api.devices.some((d) => d.name === name)) {
+          return json(404, {
+            error: 'Unknown device',
+            title: `No paired device is called ${name}`,
+            status: 404,
+            code: 'device.unknown',
+          });
+        }
+        api.devices = api.devices.filter((d) => d.name !== name);
+        // This device's credential is gone with it: from now on the core answers 401.
+        if (name === session.device) api.signedOut = true;
+        return json(204, undefined);
+      }
+    }
     return json(404, {
       error: 'Not found',
       title: `The fake API has no route for ${fake.method} ${url.pathname}`,

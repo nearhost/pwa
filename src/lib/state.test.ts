@@ -10,7 +10,7 @@ import {
   state,
 } from '#lib/api/testing.js';
 import type { State } from '#lib/api/types.js';
-import { appState, followEnvelopes, startState } from './state.svelte.js';
+import { appState, followEnvelopes, signOut, startState } from './state.svelte.js';
 
 async function settle() {
   for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -270,6 +270,35 @@ describe('startState', () => {
     await settle();
     expect(appState.connection).toBe('signed-out');
     expect(FakeEventSource.instances).toEqual([]);
+  });
+
+  it('signs out when told, as after this device is unpaired, and follows the stream no more', async () => {
+    const t = setup();
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    expect(appState.connection).toBe('live');
+    signOut();
+    expect(appState.connection).toBe('signed-out');
+    expect(FakeEventSource.last.closed).toBe(true);
+    // A drop afterwards neither says lost nor connects again.
+    FakeEventSource.last.drop();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(appState.connection).toBe('signed-out');
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it('stops the stream when any request answers 401', async () => {
+    const t = setup();
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    t.fake.on('GET /api/v1/devices', () => problem(401, 'proxy.api-sign-in'));
+    await t.client.get('/v1/devices').catch(() => {});
+    expect(appState.connection).toBe('signed-out');
+    expect(FakeEventSource.last.closed).toBe(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(appState.connection).toBe('signed-out');
   });
 
   it('says lost when the stream drops, and live again once back', async () => {

@@ -9,6 +9,13 @@ import { defineConfig } from 'vitest/config';
 // page's own origin, so the proxy sends the core's. The page cookie is Secure and host-only, so a
 // browser on the dev server never has it; with NEARHOST_PAGE_SECRET_FILE (the core's page-secret
 // file) the proxy adds it. Development only: anyone who can reach the dev server is signed in.
+// The app's own version, shown on This machine beside the core's.
+const appVersion = (
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
+
 function coreProxy(): Record<string, ProxyOptions> | undefined {
   const core = process.env.NEARHOST_CORE;
   if (!core) return undefined;
@@ -80,6 +87,7 @@ export default defineConfig({
       },
     }),
   ],
+  define: { __NEARHOST_APP_VERSION__: JSON.stringify(appVersion) },
   server: { proxy: coreProxy() },
   // vite preview takes server.proxy unless told otherwise; it must never add the page cookie.
   preview: { proxy: {} },

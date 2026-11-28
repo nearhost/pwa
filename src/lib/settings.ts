@@ -18,9 +18,22 @@ function read(key: string): string | null {
   }
 }
 
+// Set when storage refused the last change, so it lasts the session; cleared once storage takes one.
+let rememberedOpen: OpenProjectsIn | undefined;
+
 /** Where Preview opens a project: the app's frame (the default) or the browser. */
 export function openProjectsIn(): OpenProjectsIn {
+  if (rememberedOpen) return rememberedOpen;
   return read(openKey) === 'browser' ? 'browser' : 'app';
+}
+
+export function setOpenProjectsIn(where: OpenProjectsIn) {
+  try {
+    localStorage.setItem(openKey, where);
+    rememberedOpen = undefined;
+  } catch {
+    rememberedOpen = where;
+  }
 }
 
 /** Whether this device always opens project name in the browser. */

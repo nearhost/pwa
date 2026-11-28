@@ -40,6 +40,17 @@ export function followEnvelopes(follower: Follower): () => void {
 }
 
 let current: Client | undefined;
+// Ends the running state's stream and reads, leaving what it has.
+let endState: (() => void) | undefined;
+
+/**
+ * Says this device is signed out, as after it was unpaired, and stops following the core: every
+ * request would be answered 401 now. Pairing again loads the app afresh.
+ */
+export function signOut() {
+  appState.connection = 'signed-out';
+  endState?.();
+}
 
 /** The client the running state talks to the core with; screens send their writes through it. */
 export function apiClient(): Client {
@@ -64,12 +75,15 @@ export function startState(
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     if (!signal.aborted) appState.lastAnswered = new Date();
   };
+  // A 401 to any request means this device isn't signed in: say so, and stop the stream, whose
+  // drop would otherwise say lost and try again.
   const stopObserving = client.observe({
     answered,
     signedOut: () => {
-      if (!signal.aborted) appState.connection = 'signed-out';
+      if (!signal.aborted) signOut();
     },
   });
+  endState = () => controller.abort();
 
   const readSession = () =>
     client.session().then(
@@ -113,6 +127,7 @@ export function startState(
   return () => {
     controller.abort();
     stopObserving();
+    if (current === client) endState = undefined;
   };
 }
 
