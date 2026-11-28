@@ -57,7 +57,7 @@
   <span class="pill" data-state={state}>
     {#if state !== 'stopped'}<StateDot {state} size={6} />{/if}{stateLabel(state)}
   </span>
-  {#if running && !unserved}
+  {#if running}
     <!-- On a phone the row itself opens the preview. -->
     <a
       class="stretch"
@@ -68,27 +68,9 @@
     ></a>
   {/if}
   <div class="actions">
-    {#if running && unserved}
-      <!-- Not on the network: nothing to open, said rather than a dead link. -->
-      <button
-        type="button"
-        class="preview"
-        disabled
-        aria-label={`Preview ${project.name}`}
-        aria-describedby={`${id}-unserved`}
-      >
-        <Icon name="frame" size={18} stroke={2} />Preview
-      </button>
-      <button
-        type="button"
-        class="icon-button"
-        disabled
-        aria-label={`Open ${project.name} in the browser`}
-        aria-describedby={`${id}-unserved`}
-      >
-        <Icon name="external" size={18} stroke={2} />
-      </button>
-    {:else if running}
+    {#if running}
+      <!-- Without an address on the network the preview still opens in the app: its starting log,
+           or why there is no frame. -->
       <a
         class="preview"
         href={link.href}
@@ -108,6 +90,17 @@
         >
           <Icon name="external" size={18} stroke={2} />
         </a>
+      {:else if unserved}
+        <!-- Not on the network: nothing to open in the browser, said rather than a dead link. -->
+        <button
+          type="button"
+          class="icon-button"
+          disabled
+          aria-label={`Open ${project.name} in the browser`}
+          aria-describedby={`${id}-unserved`}
+        >
+          <Icon name="external" size={18} stroke={2} />
+        </button>
       {/if}
     {/if}
     <StartStop name={project.name} {state} {running} {live} label={!running} />
@@ -274,12 +267,9 @@
     background: var(--nh-raised);
   }
 
-  .preview:disabled,
   .icon-button:disabled {
     background: var(--nh-raised);
     color: var(--nh-muted);
-    font: inherit;
-    font-weight: 600;
     border: 0;
     cursor: not-allowed;
     transform: none;

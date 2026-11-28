@@ -190,7 +190,7 @@ for (const size of sizes) {
         );
       });
 
-      test('a project started on a networked core opens at its network address', async ({
+      test('a project started on a networked core shows its log, then its network address', async ({
         page,
       }) => {
         // The core gives admin's network address only once it runs: the app reads it again then.
@@ -206,14 +206,31 @@ for (const size of sizes) {
           envelope(seq, {
             event: { Time: '', Project: 'admin', Server: '', State, Message: `state: ${State}` },
           });
-        await api.send(change(2, 'starting'), change(3, 'running'));
-        await expect(card).toContainText('Running');
-        await expect(card.getByRole('link', { name: 'Open admin in the browser' })).toHaveAttribute(
-          'href',
-          'https://admin.lab.example.dev',
-        );
+        await api.send(change(2, 'starting'));
+        await expect(card).toContainText('Starting');
+        // No address on the network yet: nothing opens in the browser, but the preview does.
+        await expect(card).toContainText('Not on the network yet');
+        await expect(
+          card.getByRole('button', { name: 'Open admin in the browser' }),
+        ).toBeDisabled();
         await card.getByRole('link', { name: 'Preview admin' }).click();
         await expect(page).toHaveURL(/\/projects\/admin$/);
+        await expect(page.getByRole('status').filter({ hasText: 'Starting admin' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Open in browser' })).toBeDisabled();
+        await api.send(
+          envelope(3, {
+            event: {
+              Time: '',
+              Project: 'admin',
+              Server: '',
+              State: '',
+              Message: 'Listening on :8080',
+            },
+          }),
+        );
+        await expect(page.getByLabel('Log')).toContainText('Listening on :8080');
+
+        await api.send(change(4, 'running'));
         await expect(page.locator('iframe[data-preview]')).toHaveAttribute(
           'src',
           'https://admin.lab.example.dev',
@@ -230,23 +247,32 @@ for (const size of sizes) {
         delete state.sites!['docs-site'].routes![0].networkUrl;
         delete state.sites!.storefront.routes![1].networkUrl;
         delete state.sites!.admin.routes![0].networkUrl;
-        await fakeApi(page, { state });
+        const api = await fakeApi(page, { state });
         await serveSites(page);
         await page.goto('/');
         const main = page.locator('main');
         const card = main.getByRole('article', { name: 'docs-site' });
         await expect(card).toContainText('Not on the network yet');
-        await expect(card.getByRole('link')).toHaveCount(0);
-        await expect(
-          card.getByRole('button', { name: 'Preview docs-site', includeHidden: true }),
-        ).toBeDisabled();
-        await expect(
-          card.getByRole('button', { name: 'Open docs-site in the browser' }),
-        ).toBeDisabled();
-        await expect(
-          card.getByRole('button', { name: 'Open docs-site in the browser' }),
-        ).toHaveAccessibleDescription('Not on the network yet');
+        const open = card.getByRole('button', { name: 'Open docs-site in the browser' });
+        await expect(open).toBeDisabled();
+        await expect(open).toHaveAccessibleDescription('Not on the network yet');
         await expect(main.locator('a[href*=".test"]')).toHaveCount(0);
+        // The preview still opens: it says why there is no frame, and keeps the log in view.
+        const preview = card.getByRole('link', { name: 'Preview docs-site' });
+        await expect(preview).toHaveAttribute('href', '/projects/docs-site');
+        await preview.click();
+        await expect(page).toHaveURL(/\/projects\/docs-site$/);
+        await expect(page.locator('iframe[data-preview]')).toHaveCount(0);
+        await expect(
+          page.getByRole('heading', { name: "docs-site isn't on the network yet" }),
+        ).toBeVisible();
+        await api.send(
+          envelope(2, {
+            event: { Time: '', Project: 'docs-site', Server: '', State: '', Message: 'GET / 200' },
+          }),
+        );
+        await expect(page.getByLabel('Log')).toContainText('GET / 200');
+        await expect(page.getByRole('button', { name: 'Open in browser' })).toBeDisabled();
 
         await page.goto('/projects/storefront');
         await expect(page.locator('iframe[data-preview]')).toBeVisible();
@@ -259,10 +285,12 @@ for (const size of sizes) {
             .click();
         }
         await expect(page.locator('iframe[data-preview]')).toHaveCount(0);
-        await expect(page.getByText("storefront isn't on the network yet")).toBeVisible();
-        const open = page.getByRole('button', { name: 'Open in browser' });
-        await expect(open).toBeDisabled();
-        await expect(open).toHaveAccessibleDescription('Not on the network yet');
+        await expect(
+          page.getByRole('heading', { name: "storefront isn't on the network yet" }),
+        ).toBeVisible();
+        const openRoute = page.getByRole('button', { name: 'Open in browser' });
+        await expect(openRoute).toBeDisabled();
+        await expect(openRoute).toHaveAccessibleDescription('Not on the network yet');
         await expect(page.getByRole('link', { name: 'Open in browser' })).toHaveCount(0);
 
         // A stopped project the network doesn't have: start it to open it here.

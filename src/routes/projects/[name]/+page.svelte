@@ -12,6 +12,7 @@
   import { projectLogs } from '#lib/preview/logs.svelte.js';
   import { frameWidths, isCrossSite, type FrameWidth } from '#lib/preview/model.js';
   import PreviewFrame from '#lib/preview/PreviewFrame.svelte';
+  import ProjectLog from '#lib/preview/ProjectLog.svelte';
   import RouteTabs from '#lib/preview/RouteTabs.svelte';
   import StartingPanel from '#lib/preview/StartingPanel.svelte';
   import WidthControl from '#lib/preview/WidthControl.svelte';
@@ -110,7 +111,17 @@
         {#if error}<p class="error" role="alert">{error}</p>{/if}
       </div>
     {:else if unserved}
-      <div class="panel"><p>{name} isn't on the network yet, so it can't be shown here.</p></div>
+      <!-- Running, but this route has no address on the network: say so, and keep the log. -->
+      <div class="unserved">
+        <div class="said">
+          <h2>{name} isn't on the network yet</h2>
+          <p>
+            {where} hasn't put this route on the network, so it can't be shown here. It opens here once
+            it has.
+          </p>
+        </div>
+        <ProjectLog lines={projectLogs.lines(name)} />
+      </div>
     {:else if !address}
       <div class="panel"><p>{name} has no web route to show.</p></div>
     {:else}
@@ -311,6 +322,39 @@
     color: var(--pwa-failed);
   }
 
+  .unserved {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 720px;
+    min-height: 0;
+    margin: 0 auto;
+    padding-top: 12px;
+  }
+
+  .said {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .said h2 {
+    margin: 0;
+    color: var(--nh-text);
+    font-family: var(--nh-font-display);
+    font-size: 22px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .said p {
+    margin: 0;
+    color: var(--nh-body);
+    line-height: 1.5;
+  }
+
   .start {
     display: flex;
     width: 200px;
@@ -422,7 +466,8 @@
       box-shadow: none;
     }
 
-    .stage > :global(.starting) {
+    .stage > :global(.starting),
+    .stage > .unserved {
       padding: 12px 20px 16px;
     }
   }

@@ -3,6 +3,7 @@
   // comes. The frame takes over by itself once the project runs.
   import type { SiteRoute } from '#lib/overview/model.js';
   import { routeLabel } from './model.js';
+  import ProjectLog from './ProjectLog.svelte';
 
   let {
     name,
@@ -11,15 +12,7 @@
     lines,
   }: { name: string; message: string; routes: SiteRoute[]; lines: string[] } = $props();
 
-  let log = $state<HTMLPreElement>();
-
   const said = $derived(message ? message.charAt(0).toUpperCase() + message.slice(1) : '');
-
-  $effect(() => {
-    // Follow the newest line.
-    void lines.length;
-    if (log) log.scrollTop = log.scrollHeight;
-  });
 </script>
 
 <div class="starting">
@@ -40,12 +33,7 @@
       {/each}
     </ul>
   {/if}
-  <div class="log">
-    <h3 id="starting-log">Log</h3>
-    <pre bind:this={log} aria-labelledby="starting-log">{lines.length
-        ? lines.join('\n')
-        : 'Nothing logged yet.'}</pre>
-  </div>
+  <ProjectLog {lines} />
 </div>
 
 <style>
@@ -150,37 +138,5 @@
   .waiting {
     color: var(--pwa-starting);
     white-space: nowrap;
-  }
-
-  .log {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-height: 120px;
-  }
-
-  h3 {
-    margin: 0;
-    color: var(--nh-muted);
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  pre {
-    flex: 1;
-    min-height: 0;
-    margin: 0;
-    padding: 12px;
-    overflow: auto;
-    border-radius: var(--nh-radius-m);
-    background: var(--nh-surface);
-    box-shadow: var(--pwa-card);
-    color: var(--nh-body);
-    font-family: var(--nh-font-mono);
-    font-size: 11.5px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
 </style>
