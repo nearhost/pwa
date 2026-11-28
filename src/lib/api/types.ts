@@ -68,3 +68,21 @@ type ParamNames<P extends string> = P extends `${string}{${infer N}}${infer Rest
 export type ParamsOf<P extends string> = [ParamNames<P>] extends [never]
   ? undefined
   : Record<ParamNames<P>, string>;
+
+/** How a read of P is made: a templated path must be given its parameters. */
+export type GetOptions<P extends string> = [ParamNames<P>] extends [never]
+  ? { signal?: AbortSignal }
+  : { params: ParamsOf<P>; signal?: AbortSignal };
+
+/** The arguments after the path of a read of P: its options, required when P is templated. */
+export type GetArgs<P extends string> = [ParamNames<P>] extends [never]
+  ? [init?: GetOptions<P>]
+  : [init: GetOptions<P>];
+
+/**
+ * The arguments after the path of a write of P with M: the body, and the path parameters when P is
+ * templated, which are then required (pass undefined for the body of a write that takes none).
+ */
+export type SendArgs<P extends WritePaths, M extends MethodsOf<P>> = [ParamNames<P>] extends [never]
+  ? [body?: BodyOf<P, M>]
+  : [body: BodyOf<P, M>, params: ParamsOf<P>];

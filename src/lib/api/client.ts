@@ -2,13 +2,13 @@
 // GETs. Writes carry the token from GET /api/v1/session in X-Nearhost-CSRF and always say
 // Content-Type: application/json, body or not, or the core's gate refuses them.
 import type {
-  BodyOf,
+  GetArgs,
   GetPaths,
   MethodsOf,
-  ParamsOf,
   Problem,
   Response200,
   ResponseOf,
+  SendArgs,
   Session,
   WritePaths,
 } from './types.js';
@@ -48,13 +48,16 @@ export interface Client {
   url(path: string): string;
   /** Reads the session, keeping its token for writes. */
   session(): Promise<Session>;
-  /** Reads path; a signal ends the read early, as fetch's does. */
-  get<P extends GetPaths>(path: P, init?: { signal?: AbortSignal }): Promise<Response200<P>>;
+  /**
+   * Reads path, filling its parameters from init.params, which a templated path requires; a signal
+   * ends the read early, as fetch's does.
+   */
+  get<P extends GetPaths>(path: P, ...init: GetArgs<P>): Promise<Response200<P>>;
+  /** Writes to path with body; a templated path requires its parameters after the body. */
   send<P extends WritePaths, M extends MethodsOf<P>>(
     method: M,
     path: P,
-    body?: BodyOf<P, M>,
-    params?: ParamsOf<P>,
+    ...args: SendArgs<P, M>
   ): Promise<ResponseOf<P, M>>;
   /** Tells observer of answers and sign-outs until the returned function is called. */
   observe(observer: ClientObserver): () => void;
@@ -125,12 +128,17 @@ export function createClient(opts: { base?: string; fetch?: typeof fetch } = {})
     });
   }
 
+  type Loose = { params?: Record<string, string>; signal?: AbortSignal } | undefined;
+
   return {
     base,
     url,
     session,
-    get: (path, init) => request('GET', path, { signal: init?.signal }) as Promise<never>,
-    async send(method, path, body, params) {
+    async get(path, ...rest) {
+      const init = rest[0] as Loose;
+      return request('GET', fill(path, init?.params), { signal: init?.signal }) as Promise<never>;
+    },
+    async send(method, path, ...[body, params]) {
       const filled = fill(path, params as Record<string, string> | undefined);
       const csrf = await (token ?? session().then((s) => s.csrf));
       try {

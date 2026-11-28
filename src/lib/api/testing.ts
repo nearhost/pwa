@@ -85,6 +85,7 @@ export function state(seq: number, overrides: Partial<State> = {}): State {
     noCapture: false,
     projects: {},
     servers: {},
+    sites: {},
     passthroughs: [],
     documents: [],
     grants: [],
@@ -115,14 +116,26 @@ export class FakeEventSource {
   onopen: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
+  readonly listeners = new Map<string, ((event: MessageEvent) => void)[]>();
 
   constructor(url: string | URL) {
     this.url = String(url);
     FakeEventSource.instances.push(this);
   }
 
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
+
   close() {
     this.closed = true;
+  }
+
+  /** The core's heartbeat: a named event, data {}. */
+  heartbeat() {
+    for (const listener of this.listeners.get('heartbeat') ?? []) {
+      listener(new MessageEvent('heartbeat', { data: '{}' }));
+    }
   }
 
   open() {

@@ -3,9 +3,10 @@
 // stream is retried after 1 s, 2 s, 5 s and then every 10 s, each try reading the state first, so
 // what a client shows is never older than the stream it follows. A 401 ends it all.
 //
-// The core's keep-alives are comments, which EventSource never surfaces, so a half-open stream
-// (an iPad that slept, a network that changed) looks open until TCP gives up. So it reconnects at
-// once when the page is shown again after being hidden, and when the browser is back online.
+// The core sends a `heartbeat` event every 15 s. A stream that has carried no event of any kind
+// for 40 s is half-open (an iPad that slept, a network that changed) and counts as dropped. It
+// also reconnects at once when the page is shown again after being hidden, and when the browser
+// is back online.
 import { NotSignedIn, type Client } from './client.js';
 import type { Envelope, State } from './types.js';
 
@@ -17,6 +18,9 @@ export const readTimeout = 8000;
 /** After a wake, how long the old status stands before it turns to connecting. */
 export const wakeGrace = 400;
 
+/** How long a stream may carry no event (the core's heartbeat is every 15 s) before it is lost. */
+export const silenceLimit = 40_000;
+
 /** The waits before each try after a drop; the last one repeats. */
 export const backoff = [1000, 2000, 5000, 10000] as const;
 
@@ -24,6 +28,7 @@ interface EventSourceLike {
   onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent) => void) | null;
   onerror: ((event: Event) => void) | null;
+  addEventListener(type: 'heartbeat', listener: (event: MessageEvent) => void): void;
   close(): void;
 }
 
@@ -31,8 +36,14 @@ export interface EventsOptions {
   client: Client;
   /** A state read at the start, after a reset or a gap, and on each reconnect. */
   onState(state: State): void;
-  /** Each envelope numbered after the state, in order, once. */
-  onEnvelope(envelope: Envelope): void;
+  /**
+   * Each envelope the stream carries, in order, once. Returning true reads the state again:
+   * envelopes that arrive meanwhile wait, and so a burst of them costs one read. Those the new
+   * state already includes still come here, after it, with inState set: the state needs nothing
+   * from them, but whoever follows logs or actions does. Returning true for one of those does
+   * nothing.
+   */
+  onEnvelope(envelope: Envelope, info: { inState: boolean }): boolean | void;
   /** A reset arrived; the state is being read again. */
   onReset?(): void;
   onStatus?(status: Connection): void;
@@ -50,6 +61,8 @@ export function openEvents(opts: EventsOptions): void {
   let seq = 0;
   let source: EventSourceLike | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Fires when the stream has been silent for silenceLimit.
+  let silence: ReturnType<typeof setTimeout> | undefined;
   let attempt = 0;
   // While the state is read again, envelopes wait here.
   let held: Envelope[] | undefined;
@@ -99,13 +112,19 @@ export function openEvents(opts: EventsOptions): void {
     }
     const es = new Source(client.url(`/v1/events?after=${seq}`));
     source = es;
+    heard();
     es.onopen = () => {
       if (source !== es) return;
+      heard();
       attempt = 0;
       status('live');
     };
+    es.addEventListener('heartbeat', () => {
+      if (source === es) heard();
+    });
     es.onmessage = (event) => {
       if (source !== es) return;
+      heard();
       let envelope: Envelope;
       try {
         envelope = JSON.parse(String(event.data)) as Envelope;
@@ -120,6 +139,12 @@ export function openEvents(opts: EventsOptions): void {
     };
   }
 
+  // The stream carried something: it is not half-open. Its silence is counted from now.
+  function heard() {
+    clearTimeout(silence);
+    silence = setTimeout(() => fail(), silenceLimit);
+  }
+
   function receive(envelope: Envelope) {
     if (signal.aborted) return;
     if (held) {
@@ -128,7 +153,8 @@ export function openEvents(opts: EventsOptions): void {
     }
     if (envelope.kind === 'reset') {
       opts.onReset?.();
-      void resync([]);
+      // After a reset the numbers start again: anything the new state includes is news.
+      void resync([], -1);
       return;
     }
     if (envelope.seq <= seq) return;
@@ -137,10 +163,12 @@ export function openEvents(opts: EventsOptions): void {
       return;
     }
     seq = envelope.seq;
-    opts.onEnvelope(envelope);
+    if (opts.onEnvelope(envelope, { inState: false }) === true) void resync([]);
   }
 
-  async function resync(waiting: Envelope[]) {
+  // Reads the state again, holding what arrives meanwhile. floor is the seq every envelope up to
+  // which was already given to onEnvelope.
+  async function resync(waiting: Envelope[], floor = seq) {
     const g = generation;
     held = waiting;
     try {
@@ -151,11 +179,34 @@ export function openEvents(opts: EventsOptions): void {
     }
     const replay = held;
     held = undefined;
-    // Ones in the state are dropped; a gap left after it reads the state once more.
-    for (const envelope of replay) receive(envelope);
+    const advanced = seq > floor;
+    for (const envelope of replay) {
+      if (!current(g)) return;
+      // An envelope in the replay asked for another read: the rest wait for that one.
+      // (receive may have set held since the loop began, which TypeScript cannot see.)
+      const waiting = held as Envelope[] | undefined;
+      if (waiting) {
+        waiting.push(envelope);
+        continue;
+      }
+      if (envelope.kind !== 'reset' && envelope.seq <= seq) {
+        // In the state already, but never given out: give it out as such.
+        if (envelope.seq > floor) opts.onEnvelope(envelope, { inState: true });
+        continue;
+      }
+      // A gap the read did not close, from a state no newer than before it: reading again at
+      // once would only spin. Drop the stream and come back through the backoff.
+      if (envelope.kind !== 'reset' && envelope.seq > seq + 1 && !advanced) {
+        fail();
+        return;
+      }
+      // A gap after a newer state reads it once more.
+      receive(envelope);
+    }
   }
 
   function close() {
+    clearTimeout(silence);
     const es = source;
     source = undefined;
     es?.close();

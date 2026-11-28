@@ -183,6 +183,49 @@ describe('createClient', () => {
     expect(true).toBe(true);
   });
 
+  it('fills and escapes the path parameters of a read', async () => {
+    const { fake, client } = setup();
+    fake.on('GET /api/v1/pair/a%2Fb', () => json({ state: 'waiting' }));
+    await client.get('/v1/pair/{code}', { params: { code: 'a/b' } });
+    expect(fake.count('GET /api/v1/pair/a%2Fb')).toBe(1);
+  });
+
+  it('requires the path parameters of a templated path at compile time', async () => {
+    const { fake, client } = setup();
+    fake.on('GET /api/v1/state', () => json(state(1)));
+    fake.on(recheck, () => new Response(null, { status: 204 }));
+    const refused = (read: () => Promise<unknown>) =>
+      expect(Promise.resolve().then(read)).rejects.toThrow('missing path parameter');
+
+    // @ts-expect-error a templated read needs its parameters
+    await refused(() => client.get('/v1/pair/{code}'));
+    // @ts-expect-error ... every one of them
+    await refused(() => client.get('/v1/pair/{code}', { params: {} }));
+    // @ts-expect-error a templated write needs its parameters
+    await refused(() => client.send('POST', '/v1/projects/{name}/recheck'));
+    // @ts-expect-error ... also when it takes no body
+    await refused(() => client.send('POST', '/v1/projects/{name}/recheck', undefined));
+    // @ts-expect-error ... every one of them
+    await refused(() => client.send('POST', '/v1/projects/{name}/recheck', undefined, {}));
+
+    // A write to a path without parameters takes no body when it has none, and no parameters.
+    fake.on('POST /api/v1/stop', () => new Response(null, { status: 204 }));
+    await client.send('POST', '/v1/stop');
+    await client.send('POST', '/v1/stop', undefined);
+    // @ts-expect-error an untemplated write takes no parameters
+    await client.send('POST', '/v1/stop', undefined, {}).catch(() => {});
+    // @ts-expect-error ... nor named ones
+    await client.send('POST', '/v1/stop', undefined, { name: 'shop' }).catch(() => {});
+    expect(fake.count('POST /api/v1/stop')).toBe(4);
+
+    // A path without parameters takes none.
+    await client.get('/v1/state');
+    await client.get('/v1/state', { signal: new AbortController().signal });
+    expectTypeOf(client.get<'/v1/pair/{code}'>)
+      .parameter(1)
+      .toEqualTypeOf<{ params: { code: string }; signal?: AbortSignal }>();
+  });
+
   it('passes a signal to a read, and rejects when it aborts', async () => {
     const { fake, client } = setup();
     fake.on('GET /api/v1/state', () => new Promise<Response>(() => {}));

@@ -1,6 +1,7 @@
 <script lang="ts">
   // The app's frame: a keep-clear band at the top (app.css sets its height), the header with the
-  // mark, the wordmark and a slot for the machine name, an optional sidebar and the page.
+  // mark, the wordmark and a slot for the machine name, an optional sidebar and the page. The brand
+  // is a link, not a heading: each route renders its own <h1>.
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
   import { appName } from '#lib';
@@ -15,12 +16,12 @@
   <div class="band" data-shell-band aria-hidden="true"></div>
 
   <header>
-    <h1 class="brand">
+    <div class="brand">
       <a href={resolve('/')}>
         <Mark size={22} />
         <span class="wordmark">{appName}</span>
       </a>
-    </h1>
+    </div>
     <div class="machine">{@render header()}</div>
   </header>
 
@@ -60,15 +61,16 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 52px;
+    /* 64px of content; the border sits below it. */
+    box-sizing: content-box;
+    height: 64px;
     padding: 0 var(--nh-gutter);
     background: var(--nh-surface);
     border-bottom: 1px solid var(--nh-line);
   }
 
   .brand {
-    margin: 0;
-    font: inherit;
+    flex: none;
   }
 
   .brand a {

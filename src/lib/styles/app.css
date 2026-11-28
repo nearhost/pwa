@@ -60,3 +60,15 @@ body {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
+
+/* Each route's own heading; the header's brand is a link, not a heading. */
+h1 {
+  margin: 0 0 12px;
+  color: var(--nh-text);
+  font-family: var(--nh-font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: var(--nh-track-display);
+  overflow-wrap: anywhere;
+}

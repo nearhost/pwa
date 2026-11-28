@@ -16,6 +16,28 @@ export interface AppState {
 
 export const appState: AppState = $state({ connection: 'connecting' });
 
+/** What a follower of the stream is told with each envelope. */
+export interface EnvelopeInfo {
+  /** The state already included it when it came, so it changed nothing there. */
+  inState: boolean;
+}
+
+type Follower = (envelope: Envelope, info: EnvelopeInfo) => void;
+
+// Who follows the stream is not state anything renders.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const followers = new Set<Follower>();
+
+/**
+ * Calls follower with every envelope the stream carries, in order, once, after the state has taken
+ * it in: log lines, opened passthroughs and shown documents included. Until the returned function
+ * is called.
+ */
+export function followEnvelopes(follower: Follower): () => void {
+  followers.add(follower);
+  return () => void followers.delete(follower);
+}
+
 export function startState(
   client: Client,
   opts: { EventSource?: EventsOptions['EventSource'] } = {},
@@ -58,9 +80,13 @@ export function startState(
       appState.state = state;
       if (!appState.session) void readSession();
     },
-    onEnvelope(envelope) {
+    onEnvelope(envelope, info) {
       answered();
-      if (appState.state) applyEnvelope(appState.state, envelope);
+      // One the state already includes changes nothing there; without a state, read it.
+      let again = false;
+      if (!info.inState) again = appState.state ? applyEnvelope(appState.state, envelope) : true;
+      for (const follower of followers) follower(envelope, info);
+      return again;
     },
     onStatus(status) {
       if (status === 'live') answered();
@@ -75,27 +101,57 @@ export function startState(
 }
 
 /**
- * Brings state up to date with envelope, which comes next after it. The screens that need more of
- * an envelope (logs, opened passthroughs, shown documents) take it as they come.
+ * Brings state up to date with envelope, which comes next after it, and says whether the state
+ * must be read again for the rest: an envelope applied in part (an approval, its end), one that
+ * carries no state (a passthrough opened, a document shown, a config applied), a server's event
+ * (the state of a server's connection is not in its events) and a state change of a project the
+ * state does not have yet. The screens that need more of an envelope (logs, opened passthroughs,
+ * shown documents) take it as they come.
  */
-export function applyEnvelope(state: State, envelope: Envelope): void {
+export function applyEnvelope(state: State, envelope: Envelope): boolean {
   state.seq = envelope.seq;
   switch (envelope.kind) {
     case 'approval': {
       const approval = envelope.approval;
-      if (!approval) break;
-      const approvals = (state.approvals ?? []).filter((a) => a.id !== approval.id);
-      state.approvals = [...approvals, approval];
-      break;
+      if (approval) {
+        const approvals = (state.approvals ?? []).filter((a) => a.id !== approval.id);
+        state.approvals = [...approvals, approval];
+      }
+      return true;
     }
     case 'ended':
       state.approvals = (state.approvals ?? []).filter((a) => a.id !== envelope.id);
-      break;
-    case 'event': {
-      const event = envelope.event;
-      const project = event?.Project ? state.projects?.[event.Project] : undefined;
-      if (project && event?.State) project.State = event.State;
-      break;
-    }
+      return true;
+    case 'opened':
+    case 'shown':
+    case 'config':
+      return true;
+    case 'event':
+      return envelope.event ? applyEvent(state, envelope.event) : false;
+    default:
+      return false;
   }
+}
+
+type EngineEvent = NonNullable<Envelope['event']>;
+
+function applyEvent(state: State, event: EngineEvent): boolean {
+  // A server's event, or the proxy's own: what it changed is only in the state.
+  if (!event.Project) return true;
+  // A project's log line leaves its state alone.
+  if (!event.State) return false;
+  const project = state.projects?.[event.Project];
+  if (!project) return true;
+  project.State = event.State;
+  project.Message = reasonOf(event);
+  project.Problem = event.Report ?? null;
+  return false;
+}
+
+// The reason in a state change's message, "state: <state>: <reason>"; "" when it gives none.
+function reasonOf(event: EngineEvent): string {
+  const prefix = `state: ${event.State}`;
+  if (event.Message === prefix) return '';
+  if (event.Message.startsWith(`${prefix}: `)) return event.Message.slice(prefix.length + 2);
+  return event.Report?.title ?? '';
 }
