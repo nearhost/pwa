@@ -4,7 +4,7 @@
   "license": "MIT",
   "author": "Edward Coleridge Smith <edcoleridgesmith@gmail.com>",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "imports": {
     "#lib": "./src/lib/index.js",
     "#lib/*": "./src/lib/*"
