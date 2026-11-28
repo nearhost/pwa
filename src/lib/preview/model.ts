@@ -2,26 +2,27 @@
 // the widths the frame can take.
 
 /**
- * Whether address is on another site than the page: on a networked core the page is
+ * Whether address is on another site than the page: on a networked session the page is
  * nearhost.<domain> and a project's names under that domain are its own; an alias outside it is
  * another site, where the browser keeps the project's cookies from the frame. Off a networked
- * name no domain is known, so no http or https address is taken to be cross-site. An address
- * of any other kind always is, so it is never framed.
+ * session (a laptop's core, its page at nearhost.localhost) no domain is shared, so no http or
+ * https address is taken to be cross-site. An address of any other kind always is, so it is never
+ * framed.
  */
-export function isCrossSite(address: string, pageHost: string): boolean {
-  const domain = pageHost.toLowerCase().startsWith('nearhost.')
-    ? pageHost.slice('nearhost.'.length).toLowerCase()
-    : undefined;
-  let host: string;
+export function isCrossSite(address: string, pageHost: string, networked: boolean): boolean {
+  const host = pageHost.toLowerCase();
+  const domain =
+    networked && host.startsWith('nearhost.') ? host.slice('nearhost.'.length) : undefined;
+  let name: string;
   try {
     const url = new URL(address);
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return true;
-    host = url.hostname.toLowerCase();
+    name = url.hostname.toLowerCase();
   } catch {
     return true;
   }
   if (!domain) return false;
-  return host !== domain && !host.endsWith(`.${domain}`);
+  return name !== domain && !name.endsWith(`.${domain}`);
 }
 
 /** A route's name without the primary route's domain: storefront, mail.storefront. */

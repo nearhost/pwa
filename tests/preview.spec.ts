@@ -286,3 +286,29 @@ for (const size of sizes) {
     });
   }
 }
+
+test.describe('on a laptop core, at nearhost.localhost', () => {
+  test.use({ viewport: sizes[0].viewport });
+
+  test('frames a project’s .test address', async ({ page, browserName }) => {
+    // Chromium resolves any *.localhost name to this machine; WebKit doesn't.
+    test.skip(browserName !== 'chromium', 'only Chromium resolves nearhost.localhost');
+    await fakeApi(page, { state: canvas, session: { networked: false } });
+    await page.route(/^https:\/\/[^/]*\.test\//, (r) => {
+      const host = new URL(r.request().url()).host;
+      return r.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: `<!doctype html><title>${host}</title><h1>${host}</h1>`,
+      });
+    });
+    const port = new URL(test.info().project.use.baseURL!).port;
+    await page.goto(`http://nearhost.localhost:${port}/projects/storefront`);
+    const frame = page.locator('iframe[data-preview]');
+    await expect(frame).toHaveAttribute('src', 'https://storefront.test');
+    await expect(page.frameLocator('iframe[data-preview]').getByRole('heading')).toHaveText(
+      'storefront.test',
+    );
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+});

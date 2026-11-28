@@ -3,23 +3,38 @@ import { frameWidths, isCrossSite, routeLabel } from './model.js';
 
 describe('isCrossSite', () => {
   it('is false for a name under the networked page’s domain', () => {
-    expect(isCrossSite('https://shop.lab.example.dev/x', 'nearhost.lab.example.dev')).toBe(false);
-    expect(isCrossSite('https://lab.example.dev', 'nearhost.lab.example.dev')).toBe(false);
+    expect(isCrossSite('https://shop.lab.example.dev/x', 'nearhost.lab.example.dev', true)).toBe(
+      false,
+    );
+    expect(isCrossSite('https://lab.example.dev', 'nearhost.lab.example.dev', true)).toBe(false);
   });
 
   it('is true for an alias outside it', () => {
-    expect(isCrossSite('https://shop.example.com/', 'nearhost.lab.example.dev')).toBe(true);
-    expect(isCrossSite('https://notlab.example.dev/', 'nearhost.lab.example.dev')).toBe(true);
+    expect(isCrossSite('https://shop.example.com/', 'nearhost.lab.example.dev', true)).toBe(true);
+    expect(isCrossSite('https://notlab.example.dev/', 'nearhost.lab.example.dev', true)).toBe(true);
   });
 
   it('is false when the page is not on a networked name, where no domain is known', () => {
-    expect(isCrossSite('https://shop.test/', 'localhost')).toBe(false);
+    expect(isCrossSite('https://shop.test/', 'localhost', false)).toBe(false);
+    expect(isCrossSite('https://shop.test/', 'localhost', true)).toBe(false);
+  });
+
+  it('is false for every address off a networked session, the laptop’s nearhost.localhost too', () => {
+    expect(isCrossSite('https://shop.test/', 'nearhost.localhost', false)).toBe(false);
+    expect(isCrossSite('https://mail.shop.test/', 'nearhost.localhost', false)).toBe(false);
+    expect(isCrossSite('https://shop.example.com/', 'nearhost.lab.example.dev', false)).toBe(false);
+  });
+
+  it('takes nearhost.localhost’s domain on a networked session', () => {
+    expect(isCrossSite('https://shop.localhost/', 'nearhost.localhost', true)).toBe(false);
+    expect(isCrossSite('https://shop.test/', 'nearhost.localhost', true)).toBe(true);
   });
 
   it('is true for an address that is not an http or https one, wherever the page is', () => {
-    expect(isCrossSite('not a url', 'nearhost.lab.example.dev')).toBe(true);
-    expect(isCrossSite('javascript:alert(1)', 'localhost')).toBe(true);
-    expect(isCrossSite('data:text/html,x', 'nearhost.lab.example.dev')).toBe(true);
+    expect(isCrossSite('not a url', 'nearhost.lab.example.dev', true)).toBe(true);
+    expect(isCrossSite('javascript:alert(1)', 'localhost', false)).toBe(true);
+    expect(isCrossSite('data:text/html,x', 'nearhost.lab.example.dev', true)).toBe(true);
+    expect(isCrossSite('data:text/html,x', 'nearhost.localhost', false)).toBe(true);
   });
 });
 

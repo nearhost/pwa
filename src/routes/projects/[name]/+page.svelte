@@ -39,7 +39,7 @@
   const address = $derived(addressOf(route, networked));
   // On a networked core, why this route can't be opened from here (no network address).
   const unserved = $derived(status && unservedReason(route, networked, status.State));
-  const crossSite = $derived(address ? isCrossSite(address, page.url.hostname) : false);
+  const crossSite = $derived(address ? isCrossSite(address, page.url.hostname, networked) : false);
   const framed = $derived(status?.State === 'running' || status?.State === 'degraded');
   const error = $derived(status ? actionError(name, status.State) : undefined);
 </script>
