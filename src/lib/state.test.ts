@@ -406,6 +406,16 @@ describe('startState', () => {
     expect(appState.lastAnswered?.getTime()).toBe(Date.parse('2026-11-27T10:00:20Z'));
   });
 
+  it('counts a heartbeat as an answer', async () => {
+    const t = setup();
+    stops.push(t.stop);
+    await settle();
+    FakeEventSource.last.open();
+    vi.setSystemTime(new Date('2026-11-27T10:00:15Z'));
+    FakeEventSource.last.heartbeat();
+    expect(appState.lastAnswered?.getTime()).toBe(Date.parse('2026-11-27T10:00:15Z'));
+  });
+
   it('keeps when the connection was lost through tries, until it is live again', async () => {
     const t = setup();
     stops.push(t.stop);

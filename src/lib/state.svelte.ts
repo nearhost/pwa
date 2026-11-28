@@ -131,6 +131,8 @@ export function startState(
       }
       return again;
     },
+    // A heartbeat is the core answering too; the layout keeps it at most once a minute.
+    onHeartbeat: answered,
     onStatus(status) {
       if (status === 'live') answered();
       if (status === 'live' || status === 'signed-out') appState.lostSince = undefined;

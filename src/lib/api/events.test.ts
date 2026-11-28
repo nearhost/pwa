@@ -17,6 +17,7 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
   const covered: Envelope[] = [];
   const statuses: Connection[] = [];
   const onReset = vi.fn();
+  const onHeartbeat = vi.fn();
   const controller = new AbortController();
   const doc = Object.assign(new EventTarget(), {
     visibilityState: 'visible' as DocumentVisibilityState,
@@ -38,6 +39,7 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
       return refetch?.(e);
     },
     onReset,
+    onHeartbeat,
     onStatus: (s) => statuses.push(s),
   });
   return {
@@ -47,6 +49,7 @@ function setup(firstSeq = 5, refetch?: (envelope: Envelope) => boolean) {
     covered,
     statuses,
     onReset,
+    onHeartbeat,
     controller,
     doc,
     win,
@@ -520,6 +523,16 @@ describe('openEvents', () => {
       expect(t.statuses.at(-1)).toBe('lost');
     });
 
+    it('says each heartbeat of the current stream came, as an answer', async () => {
+      const t = setup(5);
+      await settle();
+      const es = FakeEventSource.last;
+      es.open();
+      es.heartbeat();
+      es.heartbeat();
+      expect(t.onHeartbeat).toHaveBeenCalledTimes(2);
+    });
+
     it('ignores a heartbeat from a stream it has dropped', async () => {
       const t = setup(5);
       await settle();
@@ -532,6 +545,7 @@ describe('openEvents', () => {
       second.open();
       await vi.advanceTimersByTimeAsync(30_000);
       first.heartbeat();
+      expect(t.onHeartbeat).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(10_000);
       expect(second.closed).toBe(true);
       expect(t.statuses.at(-1)).toBe('lost');

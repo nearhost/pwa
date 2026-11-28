@@ -46,6 +46,8 @@ export interface EventsOptions {
   onEnvelope(envelope: Envelope, info: { inState: boolean }): boolean | void;
   /** A reset arrived; the state is being read again. */
   onReset?(): void;
+  /** The current stream carried the core's heartbeat: the core answered. */
+  onHeartbeat?(): void;
   onStatus?(status: Connection): void;
   signal: AbortSignal;
   EventSource?: new (url: string) => EventSourceLike;
@@ -129,7 +131,9 @@ export function openEvents(opts: EventsOptions): Events {
       status('live');
     };
     es.addEventListener('heartbeat', () => {
-      if (source === es) heard();
+      if (source !== es) return;
+      heard();
+      opts.onHeartbeat?.();
     });
     es.onmessage = (event) => {
       if (source !== es) return;

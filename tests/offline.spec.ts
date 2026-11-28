@@ -113,6 +113,57 @@ test.describe('the service worker', () => {
     expect(names).not.toContain('nearhost-app-1');
   });
 
+  test('takes over at once from the old page’s worker, its /sw.js', async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    // The old page's worker is served by a route mock, which only Chromium applies to a worker's
+    // own script.
+    test.skip(browserName !== 'chromium', 'only Chromium routes a service worker’s script');
+    await context.route('**/sw.js', (route) =>
+      route.fulfill({
+        contentType: 'text/javascript',
+        body: [
+          "self.addEventListener('install', () => self.skipWaiting());",
+          "self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));",
+          "self.addEventListener('fetch', () => {});",
+        ].join('\n'),
+      }),
+    );
+    await fakeApi(page, { state: canvas });
+    // A device that had the old page: its worker is in charge of the whole origin, before the app
+    // ever loads.
+    await page.goto('/manifest.webmanifest');
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      const worker = (await navigator.serviceWorker.ready).active!;
+      if (worker.state === 'activated') return;
+      await new Promise<void>((resolve) =>
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'activated') resolve();
+        }),
+      );
+    });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'storefront' })).toBeVisible();
+    const scripts = () =>
+      page.evaluate(async () => {
+        const r = await navigator.serviceWorker.getRegistration('/');
+        return {
+          active: r?.active && new URL(r.active.scriptURL).pathname,
+          waiting: r?.waiting && new URL(r.waiting.scriptURL).pathname,
+          controller:
+            navigator.serviceWorker.controller &&
+            new URL(navigator.serviceWorker.controller.scriptURL).pathname,
+        };
+      });
+    // The open page, which the old worker controlled, is the app's worker's now, nothing waiting.
+    await expect
+      .poll(scripts, { timeout: 15_000 })
+      .toEqual({ active: '/service-worker.js', waiting: null, controller: '/service-worker.js' });
+  });
+
   test('keeps the shell and the build’s files, nothing of the core’s', async ({ page }) => {
     await fakeApi(page, { state: canvas });
     await page.goto('/');
@@ -299,4 +350,30 @@ test.describe('the offline view', () => {
       });
     }
   }
+});
+
+test.describe('when the core last answered', () => {
+  test.use({ viewport: sizes[0].viewport });
+
+  test('a heartbeat counts as an answer, kept at most once a minute', async ({ page }) => {
+    await page.clock.install();
+    const api = await fakeApi(page, { state: canvas });
+    await page.goto('/');
+    await expect(page.locator('[data-connection]')).toHaveText('Live');
+    const kept = () =>
+      page.evaluate(() => {
+        const raw = localStorage.getItem('nearhost.lastAnswered');
+        return raw ? Date.parse((JSON.parse(raw) as { at: string }).at) : 0;
+      });
+    await expect.poll(kept).toBeGreaterThan(0);
+    const first = await kept();
+    // Two minutes in which the core sends only its heartbeat, every 15 s.
+    for (let i = 0; i < 8; i++) {
+      await page.clock.fastForward(15_000);
+      await api.heartbeat();
+    }
+    // Kept once in each new minute: two minutes on, at least one of them.
+    await expect.poll(kept).toBeGreaterThanOrEqual(first + 60_000);
+    await expect(page.locator('[data-connection]')).toHaveText('Live');
+  });
 });
